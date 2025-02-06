@@ -34,6 +34,7 @@ type CognitiveEngine struct {
 	minConfidence float64
 	character     *characters.Character
 	logger        *zap.SugaredLogger
+	config        *CognitiveConfig
 }
 
 type CognitiveConfig struct {
@@ -43,6 +44,7 @@ type CognitiveConfig struct {
 	Temperature        float64
 	MaxChainLength     int
 	StabilityWindow    int
+	Model              string
 }
 
 // ThoughtChain represents a sequence of reasoning steps
@@ -69,13 +71,14 @@ type ThoughtStep struct {
 	Timestamp            time.Time
 }
 
-func NewCognitiveEngine(llmClient llm.Client, character *characters.Character, logger *zap.SugaredLogger) *CognitiveEngine {
+func NewCognitiveEngine(llmClient llm.Client, character *characters.Character, logger *zap.SugaredLogger, config *CognitiveConfig) *CognitiveEngine {
 	return &CognitiveEngine{
 		llm:           llmClient,
 		maxSteps:      3,
 		minConfidence: 0.7,
 		character:     character,
 		logger:        logger,
+		config:        config,
 	}
 }
 
@@ -274,15 +277,16 @@ func (e *CognitiveEngine) generateThoughtStep(
 ) (*ThoughtStep, error) {
 	prompt := promptGenerator(purpose, chain.Steps)
 
+	// Generate completion
 	response, err := e.llm.CreateCompletion(ctx, llm.CompletionRequest{
-		Model: "deepseek",
+		Model: e.config.Model, // Use model from config
 		Messages: []llm.Message{
 			{Role: "system", Content: e.character.System},
 			{Role: "user", Content: prompt},
 		},
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("generating completion: %w", err)
 	}
 
 	return &ThoughtStep{
@@ -427,7 +431,7 @@ func (e *CognitiveEngine) processMessage(
 	prompt := buildMessagePrompt(state, msg, stakeholder.HistoricalMsgs, stakeholder.Type)
 	// Get LLM's analysis
 	response, err := e.llm.CreateCompletion(ctx, llm.CompletionRequest{
-		Model: "deepseek",
+		Model: e.config.Model,
 		Messages: []llm.Message{
 			{
 				Role:    "system",

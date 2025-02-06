@@ -39,8 +39,9 @@ func loadConfig() (*Config, error) {
 	// Default values
 	viper.SetDefault("database.type", "sqlite")
 	viper.SetDefault("database.path", "./data/data.db")
-	viper.SetDefault("llm_config.provider", "openai")
-	viper.SetDefault("llm_config.base_url", "https://api.openai.com/v1")
+	viper.SetDefault("llm_config.provider", "deepseek")
+	viper.SetDefault("llm_config.base_url", "https://api.deepseek.com")
+	viper.SetDefault("llm_config.model", "deepseek-chat")
 
 	if err := viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
@@ -128,6 +129,15 @@ func main() {
 		SocialClient:  core.NewSocialClient(nil, &config.Social.DiscordConfig),
 		TaskManager:   tasks.NewManager(taskStore),
 		ActionManager: actionManager,
+		CognitiveConfig: &core.CognitiveConfig{
+			Model:              config.LLMConfig.Model,
+			Temperature:        0.7,
+			MaxChainLength:     5,
+			NumIterations:      3,
+			SamplesPerBatch:    2,
+			MinRewardThreshold: 0.7,
+			StabilityWindow:    3,
+		},
 	})
 
 	agent.RegisterPlugin(analysisPlugin)

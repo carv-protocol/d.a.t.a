@@ -4,3 +4,4 @@ src/.env
 .env
 d.a.t.a.json
 src/config/config.yaml
+agent.db

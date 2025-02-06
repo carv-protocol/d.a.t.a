@@ -87,6 +87,7 @@ type AgentConfig struct {
 		MaxChainLength int
 		MinConfidence  float64
 	}
+	CognitiveConfig *CognitiveConfig
 }
 
 type AgentStatus string
@@ -113,7 +114,7 @@ func NewAgent(config AgentConfig) *Agent {
 
 	return &Agent{
 		ID:            config.ID,
-		cognitive:     NewCognitiveEngine(config.LLMClient, config.Character, logger.Sugar()),
+		cognitive:     NewCognitiveEngine(config.LLMClient, config.Character, logger.Sugar(), config.CognitiveConfig),
 		memoryManager: config.MemoryManager,
 		character:     config.Character,
 		dataManager:   config.DataManager,

@@ -9,12 +9,14 @@ database:
   path: "./data/agent.db"
 
 llm_config:
-  # LLM provider: "openai", "anthropic", etc.
-  provider: "openai"
+  # LLM provider: "openai", "deepseek", etc.
+  provider: "deepseek"
   # API key for the LLM provider
   api_key: ""
   # Base URL for API calls
-  base_url: "https://api.openai.com/v1"
+  base_url: "https://api.deepseek.com"
+  # Model name
+  model: "deepseek-chat"
 
 data:
   carvid:
