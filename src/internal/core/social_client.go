@@ -78,12 +78,14 @@ type SocialMessage struct {
 type SocialClientImpl struct {
 	twitterClient    *clients.TwitterClient
 	discordBot       *clients.DiscordBot
+	telegramBot      *clients.TelegramClient
 	socialMsgChannel chan SocialMessage
 }
 
 func NewSocialClient(
 	twitterConfig *clients.TwitterConfig,
 	discordConfig *clients.DiscordConfig,
+	telegramConfig *clients.TelegramConfig,
 ) *SocialClientImpl {
 	cli := &SocialClientImpl{
 		socialMsgChannel: make(chan SocialMessage),
@@ -97,6 +99,13 @@ func NewSocialClient(
 	}
 	if discordConfig != nil {
 		cli.discordBot = clients.NewDiscordBot(discordConfig.APIToken)
+	}
+	if telegramConfig != nil {
+		client, err := clients.NewTelegramClient(telegramConfig)
+		if err != nil {
+			panic(err)
+		}
+		cli.telegramBot = client
 	}
 
 	return cli
@@ -112,6 +121,8 @@ func (sc *SocialClientImpl) SendMessage(msg SocialMessage) error {
 			Content:   msg.Content,
 			ChannelID: msg.Metadata["channel_id"].(string),
 		})
+	case "telegram":
+		return sc.telegramBot.BroadcastMessage(context.Background(), msg.Content)
 	case "all":
 		// Send to all platforms
 		if err := sc.twitterClient.Tweet(context.Background(), msg.Content); err != nil {
@@ -127,6 +138,7 @@ func (sc *SocialClientImpl) GetMessageChannel() chan SocialMessage {
 	return sc.socialMsgChannel
 }
 
+// MonitorMessages starts monitoring messages from all configured platforms
 func (sc *SocialClientImpl) MonitorMessages(ctx context.Context) error {
 	var wg sync.WaitGroup
 	if sc.twitterClient != nil {
@@ -138,11 +150,18 @@ func (sc *SocialClientImpl) MonitorMessages(ctx context.Context) error {
 	}
 
 	if sc.discordBot != nil {
-		// TODO fix context
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			sc.monitorDiscord(ctx)
+		}()
+	}
+
+	if sc.telegramBot != nil {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			sc.monitorTelegram(ctx)
 		}()
 	}
 
@@ -194,6 +213,53 @@ func (sc *SocialClientImpl) monitorDiscord(ctx context.Context) {
 				Metadata: map[string]interface{}{"channel_id": msg.ChannelID},
 			}
 		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+// monitorTelegram monitors Telegram messages
+func (sc *SocialClientImpl) monitorTelegram(ctx context.Context) {
+	// Start the Telegram listener
+	if err := sc.telegramBot.StartListener(ctx); err != nil {
+		fmt.Printf("Failed to start Telegram listener: %v\n", err)
+		return
+	}
+
+	// Get the message channel
+	channel := sc.telegramBot.GetMessageChannel()
+
+	// Monitor messages
+	for {
+		select {
+		case msg := <-channel:
+			// Convert TelegramMessage to SocialMessage
+			socialMsg := SocialMessage{
+				Type:     "message",
+				Content:  msg.Text,
+				Platform: "telegram",
+				FromUser: msg.Username,
+				Metadata: map[string]interface{}{
+					"message_id": msg.MessageID,
+					"chat_id":    msg.ChatID,
+					"user_id":    msg.UserID,
+					"is_command": msg.IsCommand,
+					"command":    msg.Command,
+					"reply_to":   msg.ReplyTo,
+					"timestamp":  msg.Timestamp,
+				},
+			}
+
+			// If it's a command, set the type accordingly
+			if msg.IsCommand {
+				socialMsg.Type = "command"
+			}
+
+			// Send to the social message channel
+			sc.socialMsgChannel <- socialMsg
+
+		case <-ctx.Done():
+			// Context cancelled, stop monitoring
 			return
 		}
 	}

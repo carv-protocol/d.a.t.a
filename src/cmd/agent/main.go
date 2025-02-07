@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"plugin"
+	"strings"
 	"syscall"
 
 	"github.com/carv-protocol/d.a.t.a/src/characters"
@@ -64,6 +65,12 @@ func loadConfig() (*Config, error) {
 	viper.Set("social.twitter.access_token", viper.Get("TWITTER_ACCESS_TOKEN"))
 	viper.Set("social.twitter.token_secret", viper.Get("TWITTER_TOKEN_SECRET"))
 	viper.Set("social.discord.api_token", viper.Get("DISCORD_API_TOKEN"))
+	viper.Set("social.telegram.bot_token", viper.Get("TELEGRAM_BOT_TOKEN"))
+	if channelID := viper.GetString("TELEGRAM_CHANNEL_ID"); channelID != "" {
+		// Remove any potential "${}" wrapper if present
+		channelID = strings.Trim(channelID, "${}")
+		viper.Set("social.telegram.channel_id", channelID)
+	}
 
 	// Environment variables take precedence
 	viper.AutomaticEnv()
@@ -126,7 +133,7 @@ func main() {
 		MemoryManager: memoryManager,
 		Stakeholders:  stakeholderManager,
 		ToolsManager:  toolsManager,
-		SocialClient:  core.NewSocialClient(nil, &config.Social.DiscordConfig),
+		SocialClient:  core.NewSocialClient(nil, &config.Social.DiscordConfig, &config.Social.TelegramConfig),
 		TaskManager:   tasks.NewManager(taskStore),
 		ActionManager: actionManager,
 		CognitiveConfig: &core.CognitiveConfig{

@@ -4,4 +4,9 @@ src/.env
 .env
 d.a.t.a.json
 src/config/config.yaml
-agent.db
+.cursorrules
+.vscode/
+.cursorignore
+config
+main
+data.db

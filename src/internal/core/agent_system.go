@@ -146,7 +146,6 @@ func (a *Agent) processMessage(msg *SocialMessage) error {
 	a.logger.Infof("Priority accounts: %t", msg.FromUser, msg.Platform, stakeholder.Type == token.StakeholderTypePriority)
 
 	// a.dataManager.FetchStakeholderInfo(a.ctx, stakeholder.ID)
-
 	processedMsg, err := a.cognitive.processMessage(a.ctx, state, msg, stakeholder)
 	if err != nil {
 		a.logger.Errorw("Error processing message", "error", err)
@@ -157,7 +156,6 @@ func (a *Agent) processMessage(msg *SocialMessage) error {
 	// a.stakeholders.FetchOrCreateStakeholder(a.ctx, msg.FromUser)
 
 	a.logger.Infof("Processed message: %+v", processedMsg)
-
 	err = a.stakeholders.AddHistoricalMsg(
 		a.ctx,
 		msg.FromUser,

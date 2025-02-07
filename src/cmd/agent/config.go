@@ -25,7 +25,8 @@ type Config struct {
 	} `mapstructure:"data"`
 
 	Social struct {
-		clients.TwitterConfig `mapstructure:"twitter"`
-		clients.DiscordConfig `mapstructure:"discord"`
+		clients.TwitterConfig  `mapstructure:"twitter"`
+		clients.DiscordConfig  `mapstructure:"discord"`
+		clients.TelegramConfig `mapstructure:"telegram"`
 	} `mapstructure:"social"`
 }
