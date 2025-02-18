@@ -1,35 +1,20 @@
 package core
 
-import "github.com/carv-protocol/d.a.t.a/src/internal/actions"
+import (
+	"github.com/carv-protocol/d.a.t.a/src/internal/actions"
+)
 
 type ActionGeneration struct {
 	Chain   *ThoughtChain
-	Actions []actions.Action
+	Actions []actions.IAction
 }
 
 // convertThoughtChainToActions converts a thought chain into executable actions
-func convertThoughtChainToActions(chain *ThoughtChain) ([]actions.Action, error) {
-	var actions []actions.Action
+func convertThoughtChainToActions(chain *ThoughtChain) ([]actions.IAction, error) {
+	var actions []actions.IAction
 
 	// Track dependencies between actions
 	// dependencies := make(map[string][]string)
-
-	var relevantSteps []*ThoughtStep
-
-	// 1. Collect only contributing steps
-	for _, step := range chain.Steps {
-		if step.ContributesToOutcome {
-			relevantSteps = append(relevantSteps, step)
-		}
-	}
-
-	// Process each thought step
-	// for i, step := range relevantSteps {
-
-	// }
-
-	// Update actions with dependencies
-	// actions = updateActionDependencies(actions, dependencies)
 
 	return actions, nil
 }

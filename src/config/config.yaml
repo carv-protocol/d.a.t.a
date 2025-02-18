@@ -9,12 +9,14 @@ database:
   path: "./data/agent.db"
 
 llm_config:
-  # LLM provider: "openai", "anthropic", etc.
+  # LLM provider: "openai", "deepseek", etc.
   provider: "openai"
   # API key for the LLM provider
   api_key: ""
   # Base URL for API calls
-  base_url: "https://api.openai.com/v1"
+  base_url: "https://api.deepseek.com"
+  # Model name
+  model: "deepseek-chat"
 
 data:
   carvid:
@@ -22,3 +24,48 @@ data:
     url: "https://api.carv.io/v1"
     # API key for CarvID
     api_key: "your-carvid-api-key-here"
+
+wallet:
+  # Private key for the wallet
+  private_key: "your-private-key-here"
+  # Network: "base" or "ethereum"
+  network: "base"
+  # RPC URL
+  rpc_url: "https://base.llamarpc.com"
+  chain_id: 8453
+  timeout: 30s
+
+token:
+  network: "base"
+  ticker: "carv"
+  contract_addr: "0xc08cd26474722ce93f4d0c34d16201461c10aa8c"
+
+# Plugin configuration
+plugin:
+  plugins:
+    d.a.t.a:
+      name: "d.a.t.a"
+      enabled: true
+      version: "1.0.0"
+      author: "CARV Protocol"
+      description: "Core data interaction plugin for Ethereum blockchain analysis"
+      dependencies: []
+      options:
+        api_url: "your-api-url-here"
+        auth_token: "your-auth-token-here"
+        chain: "ethereum-mainnet"
+        llm:
+          model: "deepseek-chat"
+          max_tokens: 2000
+          temperature: 0.7
+
+  example_plugin:
+    name: "example_plugin"
+    enabled: false
+    version: "0.1.0"
+    author: "Example Author"
+    description: "Example plugin for demonstration"
+    dependencies: ["d.a.t.a"]
+    options:
+      key1: "value1"
+      key2: "value2"

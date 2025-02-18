@@ -2,33 +2,9 @@ package tasks
 
 import (
 	"context"
-	"time"
+
+	"github.com/carv-protocol/d.a.t.a/src/internal/core"
 )
-
-type TaskStatus string
-
-const (
-	TaskStatusActive    TaskStatus = "active"
-	TaskStatusCompleted TaskStatus = "completed"
-	TaskStatusPending   TaskStatus = "pending"
-	TaskStatusFailed    TaskStatus = "failed"
-)
-
-type Task struct {
-	ID                       string
-	Name                     string
-	Description              string
-	Priority                 float64
-	ExecutionSteps           []string
-	Status                   TaskStatus
-	Deadline                 *time.Time
-	RequiresApproval         bool
-	RequiresStakeholderInput bool
-	Tools                    []string
-	CreatedBy                string
-	CreatedAt                time.Time
-	UpdatedAt                time.Time
-}
 
 type Metric struct {
 	Threshold float64
@@ -52,11 +28,10 @@ func NewManager(store *TaskStore) *Manager {
 	}
 }
 
-func (m *Manager) AddTask(ctx context.Context, task Task) error {
+func (m *Manager) AddTask(ctx context.Context, task core.Task) error {
 	return m.store.AddTask(ctx, task)
 }
 
-func (m *Manager) GetTasks(ctx context.Context) []*Task {
-	taskSlice, _ := m.store.GetAllTasks(ctx)
-	return taskSlice
+func (m *Manager) GetTasks(ctx context.Context) ([]*core.Task, error) {
+	return m.store.GetAllTasks(ctx)
 }

@@ -2,14 +2,14 @@ package core
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"strings"
 	"time"
 
 	"github.com/carv-protocol/d.a.t.a/src/characters"
-	"github.com/carv-protocol/d.a.t.a/src/internal/tasks"
-	"github.com/carv-protocol/d.a.t.a/src/internal/token"
+	"github.com/carv-protocol/d.a.t.a/src/internal/actions"
 	"github.com/carv-protocol/d.a.t.a/src/pkg/llm"
 
 	"go.uber.org/zap"
@@ -30,6 +30,7 @@ const (
 
 type CognitiveEngine struct {
 	llm           llm.Client
+	model         string
 	maxSteps      int
 	minConfidence float64
 	character     *characters.Character
@@ -69,9 +70,10 @@ type ThoughtStep struct {
 	Timestamp            time.Time
 }
 
-func NewCognitiveEngine(llmClient llm.Client, character *characters.Character, logger *zap.SugaredLogger) *CognitiveEngine {
+func NewCognitiveEngine(llmClient llm.Client, model string, character *characters.Character, logger *zap.SugaredLogger) *CognitiveEngine {
 	return &CognitiveEngine{
 		llm:           llmClient,
+		model:         model,
 		maxSteps:      3,
 		minConfidence: 0.7,
 		character:     character,
@@ -82,6 +84,7 @@ func NewCognitiveEngine(llmClient llm.Client, character *characters.Character, l
 // GenerateThoughtChain creates a DeepSeek-style reasoning chain
 func (e *CognitiveEngine) GenerateThoughtChain(
 	ctx context.Context,
+	state *SystemState,
 	input interface{},
 	prefs map[string]interface{},
 	promptGenerator promptGeneratorFunc,
@@ -97,17 +100,17 @@ func (e *CognitiveEngine) GenerateThoughtChain(
 		// Determine appropriate step purpose based on progress
 		purpose := e.determineStepPurpose(i)
 
-		step, err := e.generateThoughtStep(ctx, chain, purpose, promptGenerator)
+		step, err := e.generateThoughtStep(ctx, state, chain, purpose, promptGenerator)
 		if err != nil {
 			return nil, err
 		}
 
-		// 3. Check for "aha moment" - potential reconsideration
+		// Detect "aha moment"
 		if AhaMomentDetection := e.detectAhaMoment(
 			ctx, step, chain.Steps, step.Alternatives, prefs,
 		); purpose != PurposeConcrete && AhaMomentDetection.Triggered {
 			// Generate reconsideration step
-			step, err = e.generateThoughtStep(ctx, chain, PurposeReconsider, promptGenerator)
+			step, err = e.generateThoughtStep(ctx, state, chain, PurposeReconsider, promptGenerator)
 			if err != nil {
 				return nil, err
 			}
@@ -185,7 +188,7 @@ func formatPreviousSteps(steps []*ThoughtStep) string {
 // GenerateActions uses chain-of-thought for action planning
 func (e *CognitiveEngine) GenerateActions(
 	ctx context.Context,
-	task *tasks.Task,
+	task *Task,
 	state *SystemState,
 ) (*ActionGeneration, error) {
 	// Build action context
@@ -198,6 +201,7 @@ func (e *CognitiveEngine) GenerateActions(
 	// Generate thought chain for action planning
 	chain, err := e.GenerateThoughtChain(
 		ctx,
+		state,
 		actionContext,
 		state.StakeholderPreferences,
 		generateActionsPromptFunc(state, task, state.AvailableActions),
@@ -215,24 +219,6 @@ func (e *CognitiveEngine) GenerateActions(
 	}, nil
 }
 
-// GenerateActions uses chain-of-thought for action planning
-// func (e *CognitiveEngine) GenerateMessage(ctx context.Context, state *SystemState, msg SocialMessage) (string, error) {
-// 	// Generate initial thought
-// 	prompt := buildMessagePrompt(state, msg)
-// 	response, err := e.llm.CreateCompletion(ctx, llm.CompletionRequest{
-// 		Model: "deepseek",
-// 		Messages: []llm.Message{
-// 			{Role: "system", Content: e.character.System},
-// 			{Role: "user", Content: prompt},
-// 		},
-// 	})
-// 	if err != nil {
-// 		return "", err
-// 	}
-
-// 	return response, nil
-// }
-
 // GenerateTasks uses chain-of-thought for tasks planning
 func (e *CognitiveEngine) GenerateTasks(
 	ctx context.Context,
@@ -247,6 +233,7 @@ func (e *CognitiveEngine) GenerateTasks(
 	// Generate thought chain for action planning
 	chain, err := e.GenerateThoughtChain(
 		ctx,
+		state,
 		taskContext,
 		state.StakeholderPreferences,
 		generateTasksPromptFunc(state))
@@ -261,13 +248,14 @@ func (e *CognitiveEngine) GenerateTasks(
 	}
 
 	return &TaskGeneration{
-		Tasks: []*tasks.Task{task},
+		Tasks: []*Task{task},
 		Chain: chain,
 	}, nil
 }
 
 func (e *CognitiveEngine) generateThoughtStep(
 	ctx context.Context,
+	state *SystemState,
 	chain *ThoughtChain,
 	purpose StepPurpose,
 	promptGenerator func(StepPurpose, []*ThoughtStep) string,
@@ -275,9 +263,9 @@ func (e *CognitiveEngine) generateThoughtStep(
 	prompt := promptGenerator(purpose, chain.Steps)
 
 	response, err := e.llm.CreateCompletion(ctx, llm.CompletionRequest{
-		Model: "deepseek",
+		Model: e.model,
 		Messages: []llm.Message{
-			{Role: "system", Content: e.character.System},
+			{Role: "system", Content: buildSystemPrompt(state, nil)},
 			{Role: "user", Content: prompt},
 		},
 	})
@@ -422,16 +410,16 @@ func (e *CognitiveEngine) processMessage(
 	ctx context.Context,
 	state *SystemState,
 	msg *SocialMessage,
-	stakeholder *token.Stakeholder,
+	stakeholder *Stakeholder,
 ) (*ProcessedMessage, error) {
-	prompt := buildMessagePrompt(state, msg, stakeholder.HistoricalMsgs, stakeholder.Type)
+	prompt := buildMessagePrompt(state, msg, stakeholder)
 	// Get LLM's analysis
 	response, err := e.llm.CreateCompletion(ctx, llm.CompletionRequest{
-		Model: "deepseek",
+		Model: e.model,
 		Messages: []llm.Message{
 			{
 				Role:    "system",
-				Content: "You are a message analyzer. For each message, identify the user's intent, required action, appropriate response, and sentiment (from -1 to 1). Return JSON format.",
+				Content: buildSystemPrompt(state, stakeholder),
 			},
 			{
 				Role:    "user",
@@ -443,9 +431,34 @@ func (e *CognitiveEngine) processMessage(
 		return nil, err
 	}
 
-	e.logger.Info("LLM response: ", response)
 	// Parse LLM response into ProcessedMessage
-	return parseAnalysis(response)
+	return ParseAnalysis(response)
+}
+
+func (e *CognitiveEngine) generateActionParameters(
+	ctx context.Context,
+	state *SystemState,
+	msg *SocialMessage,
+	stakeholder *Stakeholder,
+	action actions.IAction,
+) (map[string]interface{}, error) {
+	prompt := generateActionParametersPrompt(state, msg, stakeholder, action)
+	response, err := e.llm.CreateCompletion(ctx, llm.CompletionRequest{
+		Model: e.model,
+		Messages: []llm.Message{
+			{Role: "system", Content: buildSystemPrompt(state, stakeholder)},
+			{Role: "user", Content: prompt},
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	parsedResponse, err := parseActionParameters(response)
+	if err != nil {
+		return nil, err
+	}
+	return parsedResponse, nil
 }
 
 // Helper functions
@@ -497,4 +510,32 @@ func generateAlternativeApproach(chain *ThoughtChain) string {
 	// Generate alternative approach based on current chain
 	// Implementation details...
 	return ""
+}
+
+func ParseAnalysis(response string) (*ProcessedMessage, error) {
+	if strings.HasPrefix(response, "```json") {
+		response = strings.TrimPrefix(response, "```json")
+		response = strings.TrimSuffix(response, "```")
+		response = strings.TrimSpace(response)
+	}
+
+	var processedMsg ProcessedMessage
+	if err := json.Unmarshal([]byte(response), &processedMsg); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal JSON: %w", err)
+	}
+	return &processedMsg, nil
+}
+
+func parseActionParameters(response string) (map[string]interface{}, error) {
+	if strings.HasPrefix(response, "```json") {
+		response = strings.TrimPrefix(response, "```json")
+		response = strings.TrimSuffix(response, "```")
+		response = strings.TrimSpace(response)
+	}
+
+	var params map[string]interface{}
+	if err := json.Unmarshal([]byte(response), &params); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal JSON: %w", err)
+	}
+	return params, nil
 }

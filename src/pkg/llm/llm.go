@@ -2,7 +2,9 @@ package llm
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/carv-protocol/d.a.t.a/src/pkg/llm/deepseek"
 	"github.com/carv-protocol/d.a.t.a/src/pkg/llm/openai"
 )
 
@@ -10,6 +12,7 @@ type LLMConfig struct {
 	Provider string `mapstructure:"provider"`
 	APIKey   string `mapstructure:"api_key"`
 	BaseURL  string `mapstructure:"base_url"`
+	Model    string `mapstructure:"model"`
 }
 
 type State struct {
@@ -31,8 +34,10 @@ type Client interface {
 }
 
 type clientImpl struct {
-	provider     string
-	openaiClient *openai.Client
+	provider       string
+	model          string
+	openaiClient   *openai.Client
+	deepseekClient *deepseek.Client
 }
 
 func (c *clientImpl) CreateCompletion(ctx context.Context, request CompletionRequest) (string, error) {
@@ -42,18 +47,30 @@ func (c *clientImpl) CreateCompletion(ctx context.Context, request CompletionReq
 			Model:    request.Model,
 			Messages: toOpenAIMessage(request.Messages),
 		})
+	case "deepseek":
+		return c.deepseekClient.CreateCompletion(ctx, deepseek.CompletionRequest{
+			Model:    request.Model,
+			Messages: toDeepseekMessage(request.Messages),
+		})
+	default:
+		return "", fmt.Errorf("unsupported provider: %s", c.provider)
 	}
-	return "", nil
 }
 
 func NewClient(conf *LLMConfig) Client {
-	if conf.Provider == "openai" {
-		return &clientImpl{
-			provider:     conf.Provider,
-			openaiClient: openai.NewClient(conf.APIKey),
-		}
+	client := &clientImpl{
+		provider: conf.Provider,
+		model:    conf.Model,
 	}
-	return &clientImpl{}
+
+	switch conf.Provider {
+	case "openai":
+		client.openaiClient = openai.NewClient(conf.APIKey)
+	case "deepseek":
+		client.deepseekClient = deepseek.NewClient(conf.APIKey, conf.BaseURL)
+	}
+
+	return client
 }
 
 func toOpenAIMessage(messages []Message) []openai.Message {
@@ -65,4 +82,15 @@ func toOpenAIMessage(messages []Message) []openai.Message {
 		})
 	}
 	return openAIMessages
+}
+
+func toDeepseekMessage(messages []Message) []deepseek.Message {
+	var deepseekMessages []deepseek.Message
+	for _, message := range messages {
+		deepseekMessages = append(deepseekMessages, deepseek.Message{
+			Role:    message.Role,
+			Content: message.Content,
+		})
+	}
+	return deepseekMessages
 }

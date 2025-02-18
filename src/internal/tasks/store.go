@@ -3,6 +3,7 @@ package tasks
 import (
 	"context"
 
+	"github.com/carv-protocol/d.a.t.a/src/internal/core"
 	"github.com/carv-protocol/d.a.t.a/src/pkg/database"
 )
 
@@ -17,18 +18,18 @@ func NewTaskStore(db database.Store) *TaskStore {
 	}
 }
 
-func (t *TaskStore) AddTask(ctx context.Context, task Task) error {
+func (t *TaskStore) AddTask(ctx context.Context, task core.Task) error {
 	return nil
 }
 
-func (t *TaskStore) GetTask(ctx context.Context, taskID string) (Task, error) {
-	return Task{}, nil
+func (t *TaskStore) GetTask(ctx context.Context, taskID string) (core.Task, error) {
+	return core.Task{}, nil
 }
 
-func (t *TaskStore) UpdateTask(ctx context.Context, task Task) error {
+func (t *TaskStore) UpdateTask(ctx context.Context, task core.Task) error {
 	return nil
 }
 
-func (t *TaskStore) GetAllTasks(ctx context.Context) ([]*Task, error) {
+func (t *TaskStore) GetAllTasks(ctx context.Context) ([]*core.Task, error) {
 	return nil, nil
 }

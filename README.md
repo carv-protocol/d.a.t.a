@@ -8,12 +8,17 @@
 
 D.A.T.A is a cutting-edge framework that bridges the gap between AI agents and blockchain data. Built as a plugin for AI frameworks like Eliza, it enables AI agents to autonomously fetch, process, and act on both on-chain and off-chain data, fostering intelligent, data-driven decision-making in the Web3 space.
 
+## 📖 Documentation
+
+- [Documentation](https://docs.carv.io/d.a.t.a.-ai-framework/introduction)
+
 ## 🚀 Features
 
 - **On-Chain Data Access**
   - Real-time blockchain data fetching (transactions, balances, activity metrics)
-  - Scalable backend integration with AWS Lambda, Google Cloud Functions, and Amazon Athena
-  - Support for multiple blockchain networks including Ethereum and Solana
+  - Multi-chain support (Ethereum, Base, Bitcoin Solana)
+  - Transaction monitoring and analysis
+  - Smart contract interaction
 
 - **Off-Chain Data Integration**
   - User profiles and behavioral analytics
@@ -30,82 +35,62 @@ D.A.T.A is a cutting-edge framework that bridges the gap between AI agents and b
   - Standardized query interface
   - Comprehensive blockchain activity analysis
 
-- **Collaborative Intelligence**
-  - Shared on-chain memory system
-  - Centralized knowledge repository
-  - Inter-agent communication protocols
+- **Social Integration**
+  - Twitter integration
+  - Discord support
+  - Telegram bot functionality
+  - Community engagement tracking
 
 ## 📋 Prerequisites
 
-- Node.js (v16 or higher)
-- Python 3.8+
+- Go 1.21 or higher
+- Make
 - Access to blockchain node or data provider
-- API credentials for data services
+- API credentials for social platforms
 
-## 🔧 Configuration
+## 🔧 Installation
 
-1. Create a `.env` file in the root directory
-2. Add your API credentials:
-```env
-DATA_API_KEY=your_api_key
-DATA_AUTH_TOKEN=your_auth_token
+1. Clone the repository:
+```bash
+git clone https://github.com/carv-protocol/d.a.t.a.git
+cd d.a.t.a
 ```
 
-## 💡 Usage
-[Eliza Plugin](/eliza/README.md)
+2. Install dependencies:
+```bash
+make tidy
+```
 
-## 📖 Documentation
+3. Build the project:
+```bash
+make build
+```
 
-Comprehensive documentation is available at [D.A.T.A Framework Documentation](https://docs.carv.io/d.a.t.a.-ai-framework/introduction).
+### Configuration
 
-Key topics covered:
-- Architecture Overview
-- Plugin Integration Guide
-- Query Examples
-- Best Practices
-- API Reference
+1. Create a `.env` file in the root directory:
+```env
+# LLM Configuration
+LLM_API_KEY=your_api_key
+LLM_BASE_URL=https://api.openai.com/v1
 
-## 🤝 Contributing
+# Social Media Tokens
+TWITTER_API_KEY=your_twitter_key
+DISCORD_TOKEN=your_discord_token
+TELEGRAM_BOT_TOKEN=your_telegram_token
 
-We welcome contributions from the community! Please read our [Contributing Guidelines](CONTRIBUTING.md) before submitting pull requests.
+2. Add your CARV API credentials:
+DATA_API_KEY=your_api_key
+DATA_AUTH_TOKEN=your_auth_token
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-## 📄 License
-
-This project is licensed under the ISC License - see the [LICENSE](LICENSE) file for details.
-
-## 👥 Team
-
-- CARV Protocol Team
-- Contributors from the open-source community
+3. Update the config file:
+- src/config/config.yaml
+- src/config/character_*.json
+```
 
 ## 📮 Contact & Support
 
-- [GitHub Issues](https://github.com/carv-protocol/eliza-d.a.t.a/issues) for bug reports and feature requests
-- [Dev Discord Community](https://discord.com/invite/fVPc884by4) for general developer discussions
-- [Documentation](https://docs.carv.io/d.a.t.a.-ai-framework/introduction) for technical support
-
-## 🙏 Acknowledgments
-
-Special thanks to:
-- The Eliza communities
-- Our data provider partners
-- All contributors and supporters
-
-
-## TODO List
-1. Deepseek, Claude, Llama, and more models.
-2. Telegram support.
-3. Twitter support.
-4. Enrich stakeholder token info.
-5. Postgres storage implementation and testing.
-6. Cache
-7. Testing
-8. Add dev admim account
-9. Actions
-10. Plugins
+- [GitHub Issues](https://github.com/carv-protocol/d.a.t.a/issues)
+- [Discord Community](http://discord.gg/AYyfmhMn5K)
+- [Documentation](https://docs.carv.io/d.a.t.a.-ai-framework/introduction)
+- Email: developer@carv.io

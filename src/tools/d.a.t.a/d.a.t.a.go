@@ -1,4 +1,4 @@
-package tools
+package data
 
 import (
 	"context"
@@ -24,6 +24,6 @@ func (t *CARVDataTool) Description() string {
 	It can also fetch the token info including the smart contract addresses and the token price.`
 }
 
-func (t *CARVDataTool) AvailableActions() []actions.Action {
+func (t *CARVDataTool) AvailableActions() []actions.IAction {
 	return nil
 }

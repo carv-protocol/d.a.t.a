@@ -7,9 +7,6 @@ import (
 	"github.com/carv-protocol/d.a.t.a/src/pkg/database"
 )
 
-type UserInput struct {
-}
-
 type Memory struct {
 	MemoryID  string
 	CreatedAt time.Time
@@ -18,10 +15,10 @@ type Memory struct {
 
 type Manager interface {
 	CreateMemory(ctx context.Context, memory Memory) error
-	GetMemory(ctx context.Context, id string) (*Memory, error)
+	GetMemory(ctx context.Context, memoryID string) (*Memory, error)
 	SetMemory(ctx context.Context, mem *Memory) error
 	ListMemories(ctx context.Context, filter MemoryFilter) ([]*Memory, error)
-	DeleteMemory(ctx context.Context, id string) error
+	DeleteMemory(ctx context.Context, memoryID string) error
 	SearchByEmbedding(ctx context.Context, embedding []float64, opts SearchOptions) ([]*Memory, error)
 }
 
@@ -44,8 +41,8 @@ func (m *managerImpl) CreateMemory(ctx context.Context, memory Memory) error {
 	})
 }
 
-func (m *managerImpl) GetMemory(ctx context.Context, id string) (*Memory, error) {
-	mem, err := m.store.Get(ctx, "memory", id)
+func (m *managerImpl) GetMemory(ctx context.Context, memoryID string) (*Memory, error) {
+	mem, err := m.store.Get(ctx, "memory", memoryID)
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +73,7 @@ func (m *managerImpl) ListMemories(ctx context.Context, filter MemoryFilter) ([]
 }
 
 // GetState is a generic function to retrieve any type of state
-func (m *managerImpl) DeleteMemory(ctx context.Context, id string) error {
+func (m *managerImpl) DeleteMemory(ctx context.Context, memoryID string) error {
 	return nil
 }
 

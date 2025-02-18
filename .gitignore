@@ -3,10 +3,13 @@ d.a.t.a_code.go
 src/.env
 .env
 d.a.t.a.json
-src/config/config.yaml
+
 .cursorrules
-.vscode/
 .cursorignore
+
+.vscode/
+.idea/
+
 config
 main
-data.db
+data/data.db
