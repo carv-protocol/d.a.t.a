@@ -17,26 +17,7 @@ type PostgresStore struct {
 	retryDelay time.Duration
 }
 
-type PostgresConfig struct {
-	Host     string
-	Port     int
-	User     string
-	Password string
-	DBName   string
-	SSLMode  string
-}
-
-func NewPostgresStore(config PostgresConfig) *PostgresStore {
-	connStr := fmt.Sprintf(
-		"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
-		config.Host,
-		config.Port,
-		config.User,
-		config.Password,
-		config.DBName,
-		config.SSLMode,
-	)
-
+func NewPostgresStore(connStr string) *PostgresStore {
 	return &PostgresStore{
 		connStr:    connStr,
 		maxRetries: 3,

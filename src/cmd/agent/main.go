@@ -67,7 +67,7 @@ func main() {
 
 func initializeAgent(ctx context.Context, config *Config) (*core.Agent, error) {
 	// Setup database
-	store := adapters.NewSQLiteStore(config.Database.Path)
+	store := adapters.NewPostgresStore(config.Database.Path)
 	if err := store.Connect(ctx); err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}

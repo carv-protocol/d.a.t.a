@@ -4,9 +4,9 @@ character:
 
 database:
   # Database type: "sqlite" or "postgres"
-  type: "sqlite"
+  type: "postgres"
   # Database path (for SQLite) or connection string (for Postgres)
-  path: "./data/agent.db"
+  path: "host=carv-dev-main-pgsql.proxy-c5i0giuw46h2.ap-southeast-1.rds.amazonaws.com port=5432 user=postgres password=nS&v!nNu39Wm67dXK dbname=dev sslmode=disable"
 
 llm_config:
   # LLM provider: "openai", "deepseek", etc.
