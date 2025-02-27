@@ -205,8 +205,12 @@ func getHistoricalMessages(stakeholder *Stakeholder) string {
 	if stakeholder == nil {
 		return ""
 	}
+	var msgs []string
+	for _, historicalMsg := range stakeholder.HistoricalMsgs {
+		msgs = append(msgs, historicalMsg.Content)
+	}
 
-	return strings.Join(stakeholder.HistoricalMsgs, ";")
+	return strings.Join(msgs, ";")
 }
 
 func formatProviderStates(states []*pluginCore.ProviderState) string {

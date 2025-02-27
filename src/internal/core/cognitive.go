@@ -421,13 +421,15 @@ func (e *CognitiveEngine) processMessage(
 	stakeholder *Stakeholder,
 ) (*ProcessedMessage, error) {
 	prompt := buildMessagePrompt(state, msg, stakeholder, e.promptTemplates)
+	systemPrompt := buildSystemPrompt(state, stakeholder, e.promptTemplates)
+
 	// Get LLM's analysis
 	response, err := e.llm.CreateCompletion(ctx, llm.CompletionRequest{
 		Model: e.model,
 		Messages: []llm.Message{
 			{
 				Role:    "system",
-				Content: buildSystemPrompt(state, stakeholder, e.promptTemplates),
+				Content: systemPrompt,
 			},
 			{
 				Role:    "user",

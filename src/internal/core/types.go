@@ -17,6 +17,11 @@ const (
 	StakeholderTypePriority StakeholderType = "priority"
 )
 
+type HistoricalMsg struct {
+	Content   string
+	Timestamp int64
+}
+
 // Stakeholder is a stakeholder of the agent
 type Stakeholder struct {
 	Key            string
@@ -25,7 +30,7 @@ type Stakeholder struct {
 	CarvID         string
 	Type           StakeholderType
 	TokenBalance   *TokenBalance
-	HistoricalMsgs []string
+	HistoricalMsgs []HistoricalMsg
 }
 
 // TokenInfo is a struct for token information

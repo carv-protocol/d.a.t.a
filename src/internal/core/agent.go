@@ -303,6 +303,8 @@ func (a *Agent) processMessage(msg *SocialMessage) error {
 		}
 	}()
 
+	a.logger.Infof("Begin to process message: %+v", msg)
+
 	state := a.getCurrentState()
 
 	stakeholder, err := a.stakeholders.FetchOrCreateStakeholder(

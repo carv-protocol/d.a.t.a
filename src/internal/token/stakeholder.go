@@ -45,7 +45,7 @@ func (sm *StakeholderManager) FetchOrCreateStakeholder(
 			CarvID:         "",
 			Platform:       platform,
 			Type:           stakeholderType,
-			HistoricalMsgs: []string{},
+			HistoricalMsgs: []core.HistoricalMsg{},
 		}
 
 		res, err := json.Marshal(stakeholder)
@@ -86,7 +86,19 @@ func (sm *StakeholderManager) AddHistoricalMsg(ctx context.Context, id, platform
 	if err != nil {
 		return err
 	}
-	stakeholder.HistoricalMsgs = append(stakeholder.HistoricalMsgs, msgs...)
+
+	var (
+		historicalMsgs   []core.HistoricalMsg
+		currentTimestamp = time.Now().Unix()
+	)
+	for _, msg := range msgs {
+		historicalMsgs = append(historicalMsgs, core.HistoricalMsg{
+			Content:   msg,
+			Timestamp: currentTimestamp,
+		})
+	}
+
+	stakeholder.HistoricalMsgs = append(stakeholder.HistoricalMsgs, historicalMsgs...)
 	if len(stakeholder.HistoricalMsgs) > 10 {
 		stakeholder.HistoricalMsgs = stakeholder.HistoricalMsgs[len(stakeholder.HistoricalMsgs)-10:]
 	}
