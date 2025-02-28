@@ -126,6 +126,8 @@ func initializeAgent(ctx context.Context, config *Config) (*core.Agent, error) {
 		promptTemplates = config.DefaultTemplates
 	}
 
+	limitation := initializeLimitation(config)
+
 	// Create agent
 	agentConfig := core.AgentConfig{
 		ID:           uuid.New(),
@@ -144,6 +146,7 @@ func initializeAgent(ctx context.Context, config *Config) (*core.Agent, error) {
 		ActionManager:   actionManager,
 		TokenManager:    tokenManager,
 		PluginRegistry:  pluginRegistry,
+		Limitation:      limitation,
 	}
 
 	agent, err := core.NewAgent(agentConfig)
@@ -276,6 +279,15 @@ func verifyPluginMetadata(plugin pluginCore.Plugin, config PluginConfig) error {
 		return fmt.Errorf("plugin version mismatch: got %s, want %s", plugin.Version(), config.Version)
 	}
 	return nil
+}
+
+func initializeLimitation(config *Config) *core.Limitation {
+	return &core.Limitation{
+		Enable:            config.Limitation.Enable,
+		MinTokenBalance:   config.Limitation.MinTokenBalance,
+		FrequencyFactor:   config.Limitation.FrequencyFactor,
+		FrequencyDuration: config.Limitation.FrequencyDuration,
+	}
 }
 
 func handleShutdown(ctx context.Context, agent *core.Agent, timeoutSeconds int) chan struct{} {

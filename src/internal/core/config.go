@@ -25,6 +25,7 @@ type AgentConfig struct {
 	SocialClient    SocialClient
 	PromptTemplates *PromptTemplates
 	PluginRegistry  *pluginCore.Registry
+	Limitation      *Limitation
 	Training        struct {
 		Enabled       bool
 		MaxIterations int

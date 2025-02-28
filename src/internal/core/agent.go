@@ -27,6 +27,7 @@ type Agent struct {
 	TokenManager   TokenManager
 	socialClient   SocialClient
 	pluginRegistry *pluginCore.Registry
+	limit          *Limitation
 	Goals          []Goal
 	ctx            context.Context
 	cancel         context.CancelFunc
@@ -326,6 +327,17 @@ func (a *Agent) processMessage(msg *SocialMessage) error {
 		stakeholder.TokenBalance = balance
 	}
 
+	// check limitation
+	rspMsg, limit := a.limit.CheckLimit(stakeholder)
+	if limit {
+		a.socialClient.SendMessage(a.ctx, SocialMessage{
+			Platform: msg.Platform,
+			Type:     "Response",
+			Content:  rspMsg,
+			Metadata: msg.Metadata,
+		})
+	}
+
 	processedMsg, err := a.cognitive.processMessage(a.ctx, state, msg, stakeholder)
 	if err != nil {
 		a.logger.Errorw("Error processing message", "error", err)
@@ -440,6 +452,7 @@ func NewAgent(config AgentConfig) (*Agent, error) {
 		TokenManager:   config.TokenManager,
 		socialClient:   config.SocialClient,
 		pluginRegistry: config.PluginRegistry,
+		limit:          config.Limitation,
 		ctx:            ctx,
 		cancel:         cancel,
 	}

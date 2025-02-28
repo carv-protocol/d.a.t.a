@@ -56,6 +56,13 @@ type Config struct {
 	Plugin struct {
 		Plugins map[string]PluginConfig `mapstructure:"plugins"`
 	} `mapstructure:"plugin"`
+
+	Limitation struct {
+		Enable            bool    `mapstructure:"enable"`
+		MinTokenBalance   float64 `mapstructure:"min_token_balance"`
+		FrequencyFactor   float64 `mapstructure:"frequency_factor"`
+		FrequencyDuration int64   `mapstructure:"frequency_duration"`
+	} `mapstructure:"limitation"`
 }
 
 type PluginConfig struct {

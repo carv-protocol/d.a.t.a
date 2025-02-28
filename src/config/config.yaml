@@ -60,6 +60,12 @@ social:
 web:
   port: 8000
 
+limitation:
+  enable: false
+  min_token_balance: 1.0
+  frequency_factor: 10
+  frequency_duration: 600
+
 plugin:
   plugins:
     d.a.t.a:
