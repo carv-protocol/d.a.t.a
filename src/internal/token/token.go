@@ -46,10 +46,12 @@ func (t *TokenManager) FetchNativeTokenBalance(
 
 		return &core.TokenBalance{
 			TokenInfo: core.TokenInfo{
-				Network: t.nativeToken.Network,
-				Ticker:  t.nativeToken.Ticker,
+				Network:      t.nativeToken.Network,
+				Ticker:       t.nativeToken.Ticker,
+				ContractAddr: t.nativeToken.ContractAddr,
 			},
-			Balance: balance.Amount,
+			Balance:  balance.Amount,
+			UserAddr: balance.UserAddr,
 		}, nil
 	}
 

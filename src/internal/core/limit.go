@@ -11,6 +11,7 @@ type Limitation struct {
 	MinTokenBalance   float64
 	FrequencyFactor   float64
 	FrequencyDuration int64
+	TransferAmount    float64
 }
 
 func (l Limitation) CheckLimit(stakeholder *Stakeholder) (string, bool) {

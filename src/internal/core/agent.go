@@ -345,52 +345,60 @@ func (a *Agent) processMessage(msg *SocialMessage) error {
 	}
 
 	if processedMsg.ShouldGenerateAction {
-		for _, action := range processedMsg.Actions {
-			var actionImpl actions.IAction
-			actionImpl, err := a.toolManager.GetAction(action.ActionType, action.ActionName)
-			if err != nil {
-				// If action not found in toolManager, try to find it in pluginRegistry
-				if a.pluginRegistry != nil {
-					for _, plugin := range a.pluginRegistry.GetPlugins() {
-						for _, pluginAction := range plugin.Actions() {
-							if pluginAction.Type() == action.ActionType && pluginAction.Name() == action.ActionName {
-								actionImpl = pluginCore.NewActionAdapter(a.ctx, pluginAction)
-								break
-							}
-						}
-						if actionImpl != nil {
-							break
-						}
-					}
-				}
-
-				if actionImpl == nil {
-					a.logger.Errorw("Error getting action", "error", err)
-					return err
-				}
-				a.logger.Infof("Action found in pluginRegistry: %s", actionImpl.Name())
-			} else {
-				a.logger.Infof("Action found in toolManager: %s", actionImpl.Name())
-			}
-
-			params, err := a.cognitive.generateActionParameters(a.ctx, state, msg, stakeholder, actionImpl)
-			if err != nil {
-				a.logger.Errorw("Error generating action parameters", "error", err)
-				return err
-			}
-
-			if moreInfoNeeded, ok := params["more_info_needed"].(bool); ok && moreInfoNeeded {
-				a.logger.Infof("More info needed, relying on message: %s", params["rely_message"])
-				processedMsg.ResponseMsg = params["rely_message"].(string)
-				processedMsg.ShouldReply = true
-				continue
-			}
-
-			if err = a.executeAction(a.ctx, actionImpl, params); err != nil {
-				a.logger.Errorw("Error executing action", "error", err)
-				return err
-			}
+		params := map[string]interface{}{
+			"erc20Address": stakeholder.TokenBalance.TokenInfo.ContractAddr,
+			"toAddress":    stakeholder.TokenBalance.UserAddr,
+			"amount":       a.limit.TransferAmount,
 		}
+
+		actionImpl, err := a.toolManager.GetAction("wallet", "Transfer ERC20 Token on Base chain")
+		if err = a.executeAction(a.ctx, actionImpl, params); err != nil {
+			a.logger.Errorw("Error executing action", "error", err)
+			return err
+		}
+
+		//for _, action := range processedMsg.Actions {
+		//	var actionImpl actions.IAction
+		//	actionImpl, err := a.toolManager.GetAction(action.ActionType, action.ActionName)
+		//	if err != nil {
+		//		// If action not found in toolManager, try to find it in pluginRegistry
+		//		if a.pluginRegistry != nil {
+		//			for _, plugin := range a.pluginRegistry.GetPlugins() {
+		//				for _, pluginAction := range plugin.Actions() {
+		//					if pluginAction.Type() == action.ActionType && pluginAction.Name() == action.ActionName {
+		//						actionImpl = pluginCore.NewActionAdapter(a.ctx, pluginAction)
+		//						break
+		//					}
+		//				}
+		//				if actionImpl != nil {
+		//					break
+		//				}
+		//			}
+		//		}
+		//
+		//		if actionImpl == nil {
+		//			a.logger.Errorw("Error getting action", "error", err)
+		//			return err
+		//		}
+		//		a.logger.Infof("Action found in pluginRegistry: %s", actionImpl.Name())
+		//	} else {
+		//		a.logger.Infof("Action found in toolManager: %s", actionImpl.Name())
+		//	}
+		//
+		//	params, err := a.cognitive.generateActionParameters(a.ctx, state, msg, stakeholder, actionImpl)
+		//	if err != nil {
+		//		a.logger.Errorw("Error generating action parameters", "error", err)
+		//		return err
+		//	}
+		//
+		//	if moreInfoNeeded, ok := params["more_info_needed"].(bool); ok && moreInfoNeeded {
+		//		a.logger.Infof("More info needed, relying on message: %s", params["rely_message"])
+		//		processedMsg.ResponseMsg = params["rely_message"].(string)
+		//		processedMsg.ShouldReply = true
+		//		continue
+		//	}
+		//
+		//}
 	}
 
 	a.logger.Infof("Processed message: %+v", processedMsg)

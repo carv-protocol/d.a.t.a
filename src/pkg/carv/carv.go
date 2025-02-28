@@ -21,9 +21,9 @@ type Client struct {
 }
 
 type Balance struct {
-	Amount       float64
-	Network      string
-	ContractAddr string
+	Amount   float64
+	Network  string
+	UserAddr string
 }
 
 func NewClient(apiKey string, baseURL string) *Client {
@@ -69,8 +69,8 @@ func (d *Client) GetBalanceByDiscordID(
 
 	var balanceResponse struct {
 		Data struct {
-			Balance      string `json:"balance"`
-			ContractAddr string `json:"contract_addr"`
+			Balance  string `json:"balance"`
+			UserAddr string `json:"user_address"`
 		} `json:"data"`
 		Code    int    `json:"code"`
 		Message string `json:"msg"`
@@ -91,8 +91,8 @@ func (d *Client) GetBalanceByDiscordID(
 	}
 
 	return &Balance{
-		Amount:       floatValue,
-		Network:      chainName,
-		ContractAddr: balanceResponse.Data.ContractAddr,
+		Amount:   floatValue,
+		Network:  chainName,
+		UserAddr: balanceResponse.Data.UserAddr,
 	}, nil
 }

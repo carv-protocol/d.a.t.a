@@ -439,6 +439,7 @@ func (c *BaseClient) TransferERC20Token(ctx context.Context, input *ERC20TokenTr
 	tokenAddress := common.HexToAddress(input.TokenAddress)
 	if input.GasLimit == 0 {
 		gasLimit, err := c.client.EstimateGas(ctx, ethereum.CallMsg{
+			From: address,
 			To:   &tokenAddress,
 			Data: data,
 		})

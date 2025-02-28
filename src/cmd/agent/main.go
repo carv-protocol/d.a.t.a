@@ -287,6 +287,7 @@ func initializeLimitation(config *Config) *core.Limitation {
 		MinTokenBalance:   config.Limitation.MinTokenBalance,
 		FrequencyFactor:   config.Limitation.FrequencyFactor,
 		FrequencyDuration: config.Limitation.FrequencyDuration,
+		TransferAmount:    config.Limitation.TransferAmount,
 	}
 }
 

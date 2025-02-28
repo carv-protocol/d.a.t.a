@@ -452,11 +452,12 @@ func (e *CognitiveEngine) generateActionParameters(
 	stakeholder *Stakeholder,
 	action actions.IAction,
 ) (map[string]interface{}, error) {
+	systemPrompt := buildSystemPrompt(state, stakeholder, e.promptTemplates)
 	prompt := generateActionParametersPrompt(state, msg, stakeholder, action, e.promptTemplates)
 	response, err := e.llm.CreateCompletion(ctx, llm.CompletionRequest{
 		Model: e.model,
 		Messages: []llm.Message{
-			{Role: "system", Content: buildSystemPrompt(state, stakeholder, e.promptTemplates)},
+			{Role: "system", Content: systemPrompt},
 			{Role: "user", Content: prompt},
 		},
 	})

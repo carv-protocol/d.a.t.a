@@ -62,6 +62,7 @@ type Config struct {
 		MinTokenBalance   float64 `mapstructure:"min_token_balance"`
 		FrequencyFactor   float64 `mapstructure:"frequency_factor"`
 		FrequencyDuration int64   `mapstructure:"frequency_duration"`
+		TransferAmount    float64 `mapstructure:"transfer_amount"`
 	} `mapstructure:"limitation"`
 }
 

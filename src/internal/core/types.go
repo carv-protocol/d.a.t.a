@@ -43,7 +43,8 @@ type TokenInfo struct {
 // TokenBalance is a struct for token balance information
 type TokenBalance struct {
 	TokenInfo
-	Balance float64
+	Balance  float64
+	UserAddr string
 }
 
 // TaskStatus is an enum for task status
