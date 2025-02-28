@@ -28,14 +28,13 @@ const (
 
 // Plugin implements the core.Plugin interface for data functionality
 type Plugin struct {
-	config     *core.PluginConfig
-	llmClient  llm.Client
-	logger     *zap.SugaredLogger
-	actions    []core.Action
-	providers  []core.Provider
-	evaluators []core.Evaluator
-	services   []core.Service
-	clients    []core.Client
+	config    *core.PluginConfig
+	llmClient llm.Client
+	logger    *zap.SugaredLogger
+	actions   []core.Action
+	providers []core.Provider
+	services  []core.Service
+	clients   []core.Client
 }
 
 // NewPlugin creates a new data plugin
@@ -81,11 +80,6 @@ func (p *Plugin) Actions() []core.Action {
 // Providers implements core.Plugin interface
 func (p *Plugin) Providers() []core.Provider {
 	return p.providers
-}
-
-// Evaluators implements core.Plugin interface
-func (p *Plugin) Evaluators() []core.Evaluator {
-	return p.evaluators
 }
 
 // Services implements core.Plugin interface

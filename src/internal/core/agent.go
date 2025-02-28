@@ -5,10 +5,13 @@ import (
 	"context"
 	"fmt"
 	"plugin"
+	"strings"
 	"time"
 
 	"github.com/carv-protocol/d.a.t.a/src/characters"
 	"github.com/carv-protocol/d.a.t.a/src/internal/actions"
+	"github.com/carv-protocol/d.a.t.a/src/internal/commands"
+	"github.com/carv-protocol/d.a.t.a/src/internal/types"
 	pluginCore "github.com/carv-protocol/d.a.t.a/src/plugins/core"
 
 	"github.com/google/uuid"
@@ -30,6 +33,7 @@ type Agent struct {
 	Goals          []Goal
 	ctx            context.Context
 	cancel         context.CancelFunc
+	CommandManager *commands.Registry
 }
 
 // SystemState represents the complete state of the agent system
@@ -43,13 +47,14 @@ type SystemState struct {
 	StakeholderPreferences map[string]interface{}
 	// ActiveVotes            map[string][]Vote
 
-	Character        *characters.Character
-	AvailableTools   []Tool
-	AvailableActions []actions.IAction
+	Character           *characters.Character
+	AvailableTools      []Tool
+	AvailableActions    []actions.IAction
+	AvailableEvaluators []pluginCore.Evaluator
 	// Task and action information
 	ActiveTasks     []*Task
 	PendingActions  []actions.IAction
-	NativeTokenInfo *TokenInfo
+	NativeTokenInfo *types.TokenInfo
 	ProviderStates  []*pluginCore.ProviderState
 }
 
@@ -87,7 +92,7 @@ func (a *Agent) Start() error {
 			a.ctx,
 			account.ID,
 			account.Platform,
-			StakeholderTypePriority,
+			types.StakeholderTypePriority,
 		)
 		if err != nil {
 			return err
@@ -167,6 +172,7 @@ func (a *Agent) getCurrentState() *SystemState {
 	// Get plugin actions and provider states
 	var pluginActions []actions.IAction
 	var providerStates []*pluginCore.ProviderState
+	var pluginEvaluators []pluginCore.Evaluator
 
 	if a.pluginRegistry != nil {
 		// Collect actions from plugins
@@ -195,6 +201,11 @@ func (a *Agent) getCurrentState() *SystemState {
 		a.logger.Infof("Available action: %s", action.Name())
 	}
 
+	// print all evaluators
+	for _, evaluator := range pluginEvaluators {
+		a.logger.Infof("Available evaluator: %s", evaluator.Name())
+	}
+
 	// print all provider states
 	for _, state := range providerStates {
 		a.logger.Infof("Provider state: %+v", state)
@@ -204,6 +215,7 @@ func (a *Agent) getCurrentState() *SystemState {
 		Character:              a.character,
 		AvailableTools:         a.toolManager.AvailableTools(),
 		AvailableActions:       append(a.toolManager.AvailableActions(), pluginActions...),
+		AvailableEvaluators:    pluginEvaluators,
 		Timestamp:              time.Now(),
 		AgentStates:            a.GetState(),
 		StakeholderPreferences: pref,
@@ -213,88 +225,63 @@ func (a *Agent) getCurrentState() *SystemState {
 	}
 }
 
-// Social media monitoring
-func (a *Agent) monitorSocialInputs() {
-	msgQueue := a.socialClient.GetMessageChannel()
-	// TODO graceful shutdown
-	go a.socialClient.MonitorMessages(a.ctx)
-	for {
-		select {
-		case msg := <-msgQueue:
-			a.processMessage(&msg)
-		case <-a.ctx.Done():
-			return
-		}
+// processCommand handles command messages starting with '/'
+func (a *Agent) processCommand(msg *types.SocialMessage) error {
+	a.logger.Infof("Processing command: %s", msg.Content)
+	if a.CommandManager == nil {
+		a.logger.Warn("Command manager is not initialized")
+		return nil
 	}
+
+	// Get the command name (first word after /)
+	args := strings.Fields(msg.Content)
+	if len(args) == 0 {
+		return nil
+	}
+	cmdName := args[0][1:] // Remove leading '/' from first word
+
+	cmd, exists := a.CommandManager.Get(cmdName)
+	if !exists {
+		a.logger.Warnw("Command not found", "command", cmdName)
+		a.socialClient.SendMessage(a.ctx, types.SocialMessage{
+			Platform: msg.Platform,
+			Type:     "Response",
+			Content:  fmt.Sprintf("Command not found: `%s`. Use `/help` to see available commands.", cmdName),
+			Metadata: msg.Metadata,
+		})
+		return nil
+	}
+
+	// Convert core.SocialMessage to types.SocialMessage
+	typesMsg := &types.SocialMessage{
+		Platform: msg.Platform,
+		FromUser: msg.FromUser,
+		Content:  msg.Content,
+		Metadata: msg.Metadata,
+	}
+
+	if err := cmd.Execute(a.ctx, typesMsg); err != nil {
+		a.logger.Errorw("Failed to execute command", "command", cmdName, "error", err)
+		return err
+	}
+
+	a.socialClient.SendMessage(a.ctx, types.SocialMessage{
+		Platform: msg.Platform,
+		Type:     "Response",
+		Content:  typesMsg.Content,
+		Metadata: msg.Metadata,
+	})
+
+	return nil
 }
 
-// executeAction executes a generic action
-func (a *Agent) executeAction(ctx context.Context, action actions.IAction, params map[string]interface{}) error {
-	a.logger.Infow("Executing action", "type", action.Type(), "params", params)
-	return action.Execute(ctx, params)
-}
-
-// executeActionWithResponse executes an action that returns a response
-func (a *Agent) executeActionWithResponse(ctx context.Context, action actions.IAction, msg *SocialMessage, processedMsg *ProcessedMessage) error {
-	// a.logger.Infow("Executing action with response", "type", action.Type())
-
-	// // Try to cast to FetchTransactionAction
-	// if fetchAction, ok := action.(*actions.FetchTransactionAction); ok {
-	// 	return a.executeFetchTransactionAction(ctx, fetchAction, msg, processedMsg)
-	// }
-
-	// Handle other action types here
-	return fmt.Errorf("unsupported action type: %s", action.Type())
-}
-
-// executeFetchTransactionAction handles the fetch transaction action specifically
-// func (a *Agent) executeFetchTransactionAction(ctx context.Context, action *actions.FetchTransactionAction, msg *SocialMessage, processedMsg *ProcessedMessage) error {
-// 	// Generate SQL query
-// 	query, err := action.GenerateQuery(ctx, msg.Content)
-// 	if err != nil {
-// 		a.logger.Errorw("Error generating SQL query", "error", err)
-// 		return err
-// 	}
-
-// 	// Execute the query
-// 	params := actions.FetchTransactionParams{
-// 		Limit: utils.IntPtr(10), // Default limit to 10 results
-// 	}
-// 	result, err := action.ExecuteWithParams(ctx, query, params)
-// 	if err != nil {
-// 		a.logger.Errorw("Error executing query", "error", err)
-// 		return err
-// 	}
-
-// 	// Build response content
-// 	responseContent := a.buildQueryResponse(processedMsg.ResponseMsg, result)
-
-// 	// Send response
-// 	return a.socialClient.SendMessage(ctx, SocialMessage{
-// 		Platform: msg.Platform,
-// 		Type:     "Response",
-// 		Content:  responseContent,
-// 		Metadata: msg.Metadata,
-// 	})
-// }
-
-// buildQueryResponse builds the response content based on query results
-// func (a *Agent) buildQueryResponse(defaultResponse string, result *actions.TransactionQueryResult) string {
-// 	if result != nil && result.Success {
-// 		if result.Analysis != "" {
-// 			return result.Analysis
-// 		}
-// 		return fmt.Sprintf("\n\nQuery Results:\n%s", actions.FormatQueryResult(result))
-// 	}
-// 	return defaultResponse
-// }
-
-func (a *Agent) processMessage(msg *SocialMessage) error {
+// processMessage handles regular (non-command) messages
+func (a *Agent) processMessage(msg *types.SocialMessage) error {
 	var err error
 	defer func() {
 		if err != nil {
 			a.logger.Errorw("Error processing message", "error", err)
-			a.socialClient.SendMessage(a.ctx, SocialMessage{
+			a.socialClient.SendMessage(a.ctx, types.SocialMessage{
 				Platform: msg.Platform,
 				Type:     "Response",
 				Content:  "Something went wrong. Please try again later.",
@@ -309,14 +296,14 @@ func (a *Agent) processMessage(msg *SocialMessage) error {
 		a.ctx,
 		msg.FromUser,
 		msg.Platform,
-		StakeholderTypeUser,
+		types.StakeholderTypeUser,
 	)
 	if err != nil {
 		a.logger.Errorw("Error fetching stakeholder", "error", err)
 		return err
 	}
 
-	a.logger.Infof("Priority accounts: %t", stakeholder.Type == StakeholderTypePriority)
+	a.logger.Infof("Priority accounts: %t", stakeholder.Type == types.StakeholderTypePriority)
 
 	balance, _ := a.TokenManager.FetchNativeTokenBalance(a.ctx, msg.FromUser, msg.Platform)
 	if balance != nil {
@@ -396,7 +383,7 @@ func (a *Agent) processMessage(msg *SocialMessage) error {
 
 	if processedMsg.ShouldReply {
 		// If we didn't send a response with analysis, send the original response
-		a.socialClient.SendMessage(a.ctx, SocialMessage{
+		a.socialClient.SendMessage(a.ctx, types.SocialMessage{
 			Platform: msg.Platform,
 			Type:     "Response",
 			Content:  processedMsg.ResponseMsg,
@@ -404,11 +391,36 @@ func (a *Agent) processMessage(msg *SocialMessage) error {
 		})
 	}
 
-	// if processedMsg.ShouldGenerateTask && stakeholder.Type == StakeholderTypePriority {
-	// 	a.evaluateAndExecuteTasks()
-	// }
-
 	return nil
+}
+
+// monitorSocialInputs handles incoming social media messages
+func (a *Agent) monitorSocialInputs() {
+	msgQueue := a.socialClient.GetMessageChannel()
+	go a.socialClient.MonitorMessages(a.ctx)
+	for {
+		select {
+		case msg := <-msgQueue:
+			// Route message to appropriate handler based on type
+			if len(msg.Content) > 0 && msg.Content[0] == '/' {
+				if err := a.processCommand(&msg); err != nil {
+					a.logger.Errorw("Error processing command", "error", err)
+				}
+			} else {
+				if err := a.processMessage(&msg); err != nil {
+					a.logger.Errorw("Error processing message", "error", err)
+				}
+			}
+		case <-a.ctx.Done():
+			return
+		}
+	}
+}
+
+// executeAction executes a generic action
+func (a *Agent) executeAction(ctx context.Context, action actions.IAction, params map[string]interface{}) error {
+	a.logger.Infow("Executing action", "type", action.Type(), "params", params)
+	return action.Execute(ctx, params)
 }
 
 func (a *Agent) Shutdown(ctx context.Context) error {
@@ -440,6 +452,7 @@ func NewAgent(config AgentConfig) (*Agent, error) {
 		pluginRegistry: config.PluginRegistry,
 		ctx:            ctx,
 		cancel:         cancel,
+		CommandManager: config.CommandManager,
 	}
 
 	return agent, nil

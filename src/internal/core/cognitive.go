@@ -10,6 +10,7 @@ import (
 
 	"github.com/carv-protocol/d.a.t.a/src/characters"
 	"github.com/carv-protocol/d.a.t.a/src/internal/actions"
+	"github.com/carv-protocol/d.a.t.a/src/internal/types"
 	"github.com/carv-protocol/d.a.t.a/src/pkg/llm"
 
 	"go.uber.org/zap"
@@ -69,6 +70,18 @@ type ThoughtStep struct {
 	Purpose              StepPurpose
 	Metadata             map[string]interface{}
 	Timestamp            time.Time
+}
+
+type ProcessedMessage struct {
+	ResponseMsg          string
+	ShouldReply          bool
+	ShouldGenerateAction bool
+	Actions              []Action
+}
+
+type Action struct {
+	ActionType string
+	ActionName string
 }
 
 func NewCognitiveEngine(
@@ -283,9 +296,9 @@ func (e *CognitiveEngine) generateThoughtStep(
 
 	return &ThoughtStep{
 		// Core reasoning content
-		Content:              extractThinkingContent(response),
-		Evidence:             extractEvidence(response),
-		Alternatives:         extractAlternatives(response),
+		Content:              e.extractThinkingContent(response),
+		Evidence:             e.extractEvidence(response),
+		Alternatives:         e.extractAlternatives(response),
 		Purpose:              purpose,
 		ContributesToOutcome: e.doesStepContributeToOutcome(purpose, chain),
 	}, nil
@@ -346,12 +359,12 @@ func (e *CognitiveEngine) evaluateAlternative(alternative string) float64 {
 	}
 
 	// Check for concrete steps
-	if !containsConcreteSteps(alternative) {
+	if !e.containsConcreteSteps(alternative) {
 		score *= 0.7
 	}
 
 	// Assess feasibility
-	if !assessFeasibility(alternative) {
+	if !e.assessFeasibility(alternative) {
 		score *= 0.6
 	}
 
@@ -360,7 +373,7 @@ func (e *CognitiveEngine) evaluateAlternative(alternative string) float64 {
 
 // Utility functions
 
-func parseAlternatives(response string) []string {
+func (e *CognitiveEngine) parseAlternatives(response string) []string {
 	// Extract alternatives between <think> tags
 	alternatives := make([]string, 0)
 
@@ -376,7 +389,7 @@ func parseAlternatives(response string) []string {
 	return alternatives
 }
 
-func containsConcreteSteps(alternative string) bool {
+func (e *CognitiveEngine) containsConcreteSteps(alternative string) bool {
 	// Check for numbered steps or action words
 	return strings.Contains(alternative, "1.") ||
 		strings.Contains(alternative, "First") ||
@@ -384,7 +397,7 @@ func containsConcreteSteps(alternative string) bool {
 		strings.Contains(alternative, "Start by")
 }
 
-func assessFeasibility(alternative string) bool {
+func (e *CognitiveEngine) assessFeasibility(alternative string) bool {
 	// Check for implementation details and resource considerations
 	return strings.Contains(alternative, "implement") ||
 		strings.Contains(alternative, "resource") ||
@@ -392,7 +405,7 @@ func assessFeasibility(alternative string) bool {
 		strings.Contains(alternative, "need")
 }
 
-func containsAspect(step string, aspect string) bool {
+func (e *CognitiveEngine) containsAspect(step string, aspect string) bool {
 	aspectPatterns := map[string][]string{
 		"problem_definition": {"problem", "challenge", "objective", "goal"},
 		"methodology":        {"method", "approach", "strategy", "process"},
@@ -414,11 +427,12 @@ func containsAspect(step string, aspect string) bool {
 	return false
 }
 
+// processMessage processes a social message and returns a response
 func (e *CognitiveEngine) processMessage(
 	ctx context.Context,
 	state *SystemState,
-	msg *SocialMessage,
-	stakeholder *Stakeholder,
+	msg *types.SocialMessage,
+	stakeholder *types.Stakeholder,
 ) (*ProcessedMessage, error) {
 	prompt := buildMessagePrompt(state, msg, stakeholder, e.promptTemplates)
 	// Get LLM's analysis
@@ -435,19 +449,21 @@ func (e *CognitiveEngine) processMessage(
 			},
 		},
 	})
+
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to generate response: %w", err)
 	}
 
 	// Parse LLM response into ProcessedMessage
-	return ParseAnalysis(response)
+	return e.ParseAnalysis(response)
 }
 
+// generateActionParameters generates parameters for an action based on the message
 func (e *CognitiveEngine) generateActionParameters(
 	ctx context.Context,
 	state *SystemState,
-	msg *SocialMessage,
-	stakeholder *Stakeholder,
+	msg *types.SocialMessage,
+	stakeholder *types.Stakeholder,
 	action actions.IAction,
 ) (map[string]interface{}, error) {
 	prompt := generateActionParametersPrompt(state, msg, stakeholder, action, e.promptTemplates)
@@ -458,11 +474,12 @@ func (e *CognitiveEngine) generateActionParameters(
 			{Role: "user", Content: prompt},
 		},
 	})
+
 	if err != nil {
 		return nil, err
 	}
 
-	parsedResponse, err := parseActionParameters(response)
+	parsedResponse, err := e.parseActionParameters(response)
 	if err != nil {
 		return nil, err
 	}
@@ -471,7 +488,7 @@ func (e *CognitiveEngine) generateActionParameters(
 
 // Helper functions
 // ExtractThinkingContent extracts the core reasoning content from an LLM response.
-func extractThinkingContent(response string) string {
+func (e *CognitiveEngine) extractThinkingContent(response string) string {
 	// Define a regex pattern to capture content within <think> tags
 	pattern := `<think>(.*?)</think>`
 	re := regexp.MustCompile(pattern)
@@ -485,42 +502,42 @@ func extractThinkingContent(response string) string {
 	return strings.TrimSpace(response)
 }
 
-func extractEvidence(response string) []string {
+func (e *CognitiveEngine) extractEvidence(response string) []string {
 	// TODO: implement me
 	// Extract evidence from response
 	// Implementation details...
 	return nil
 }
 
-func extractAlternatives(response string) []string {
+func (e *CognitiveEngine) extractAlternatives(response string) []string {
 	// TODO: implement me
 	// Extract evidence from response
 	// Implementation details...
 	return nil
 }
 
-func extractAnwser(response string) []string {
+func (e *CognitiveEngine) extractAnwser(response string) []string {
 	// TODO: implement me
 	// Extract evidence from response
 	// Implementation details...
 	return nil
 }
 
-func calculateConfidence(response string) float64 {
+func (e *CognitiveEngine) calculateConfidence(response string) float64 {
 	// TODO: implement me
 	// Calculate confidence based on response
 	// Implementation details...
 	return 0.0
 }
 
-func generateAlternativeApproach(chain *ThoughtChain) string {
+func (e *CognitiveEngine) generateAlternativeApproach(chain *ThoughtChain) string {
 	// TODO: implement me
 	// Generate alternative approach based on current chain
 	// Implementation details...
 	return ""
 }
 
-func ParseAnalysis(response string) (*ProcessedMessage, error) {
+func (e *CognitiveEngine) ParseAnalysis(response string) (*ProcessedMessage, error) {
 	if strings.HasPrefix(response, "```json") {
 		response = strings.TrimPrefix(response, "```json")
 		response = strings.TrimSuffix(response, "```")
@@ -534,7 +551,7 @@ func ParseAnalysis(response string) (*ProcessedMessage, error) {
 	return &processedMsg, nil
 }
 
-func parseActionParameters(response string) (map[string]interface{}, error) {
+func (e *CognitiveEngine) parseActionParameters(response string) (map[string]interface{}, error) {
 	if strings.HasPrefix(response, "```json") {
 		response = strings.TrimPrefix(response, "```json")
 		response = strings.TrimSuffix(response, "```")
@@ -546,4 +563,55 @@ func parseActionParameters(response string) (map[string]interface{}, error) {
 		return nil, fmt.Errorf("failed to unmarshal JSON: %w", err)
 	}
 	return params, nil
+}
+
+func (e *CognitiveEngine) buildMessagePrompt(state *SystemState, msg *types.SocialMessage, stakeholder *types.Stakeholder) string {
+	var prompt strings.Builder
+
+	// Add system state
+	prompt.WriteString(e.buildSystemPrompt(state, stakeholder))
+
+	// Add message context
+	prompt.WriteString(fmt.Sprintf("\nMessage from user %s on %s: %s\n", msg.FromUser, msg.Platform, msg.Content))
+
+	return prompt.String()
+}
+
+func (e *CognitiveEngine) buildSystemPrompt(state *SystemState, stakeholder *types.Stakeholder) string {
+	var prompt strings.Builder
+
+	// Add character info
+	prompt.WriteString(fmt.Sprintf("You are %s.\n", state.Character.Name))
+	prompt.WriteString(fmt.Sprintf("Your system: %s\n", state.Character.System))
+	if len(state.Character.Bio) > 0 {
+		prompt.WriteString(fmt.Sprintf("Your bio: %s\n", strings.Join(state.Character.Bio, "\n")))
+	}
+
+	// Add stakeholder info if available
+	if stakeholder != nil {
+		prompt.WriteString(fmt.Sprintf("\nStakeholder Info:\n"))
+		prompt.WriteString(fmt.Sprintf("Type: %s\n", stakeholder.Type))
+		if stakeholder.TokenBalance != nil {
+			prompt.WriteString(fmt.Sprintf("Token Balance: %.2f\n", stakeholder.TokenBalance.Balance))
+		}
+	}
+
+	return prompt.String()
+}
+
+func (e *CognitiveEngine) generateActionParametersPrompt(state *SystemState, msg *types.SocialMessage, stakeholder *types.Stakeholder, action actions.IAction) string {
+	var prompt strings.Builder
+
+	// Add system state
+	prompt.WriteString(e.buildSystemPrompt(state, stakeholder))
+
+	// Add action context
+	prompt.WriteString(fmt.Sprintf("\nAction to execute: %s\n", action.Name()))
+	prompt.WriteString(fmt.Sprintf("Action type: %s\n", action.Type()))
+	prompt.WriteString(fmt.Sprintf("Action description: %s\n", action.Description()))
+
+	// Add message context
+	prompt.WriteString(fmt.Sprintf("\nMessage from user %s on %s: %s\n", msg.FromUser, msg.Platform, msg.Content))
+
+	return prompt.String()
 }

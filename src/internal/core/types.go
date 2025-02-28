@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/carv-protocol/d.a.t.a/src/internal/actions"
+	"github.com/carv-protocol/d.a.t.a/src/internal/types"
 )
 
 // StakeholderType is an enum for stakeholder types
@@ -17,29 +18,29 @@ const (
 	StakeholderTypePriority StakeholderType = "priority"
 )
 
-// Stakeholder is a stakeholder of the agent
-type Stakeholder struct {
-	Key            string
-	ID             string
-	Platform       string
-	CarvID         string
-	Type           StakeholderType
-	TokenBalance   *TokenBalance
-	HistoricalMsgs []string
-}
+// // Stakeholder is a stakeholder of the agent
+// type Stakeholder struct {
+// 	Key            string
+// 	ID             string
+// 	Platform       string
+// 	CarvID         string
+// 	Type           StakeholderType
+// 	TokenBalance   *TokenBalance
+// 	HistoricalMsgs []string
+// }
 
-// TokenInfo is a struct for token information
-type TokenInfo struct {
-	Network      string
-	Ticker       string
-	ContractAddr string
-}
+// // TokenInfo is a struct for token information
+// type TokenInfo struct {
+// 	Network      string
+// 	Ticker       string
+// 	ContractAddr string
+// }
 
-// TokenBalance is a struct for token balance information
-type TokenBalance struct {
-	TokenInfo
-	Balance float64
-}
+// // TokenBalance is a struct for token balance information
+// type TokenBalance struct {
+// 	TokenInfo
+// 	Balance float64
+// }
 
 // TaskStatus is an enum for task status
 type TaskStatus string
@@ -70,15 +71,15 @@ type Task struct {
 
 // StakeholderManager is an interface for managing stakeholders
 type StakeholderManager interface {
-	FetchOrCreateStakeholder(ctx context.Context, id, platform string, stakeholderType StakeholderType) (*Stakeholder, error)
+	FetchOrCreateStakeholder(ctx context.Context, id, platform string, stakeholderType types.StakeholderType) (*types.Stakeholder, error)
 	AddHistoricalMsg(ctx context.Context, id, platform string, msgs []string) error
 	GetAggregatedPreferences(ctx context.Context) (map[string]interface{}, error)
 }
 
 // TokenManager is an interface for managing tokens
 type TokenManager interface {
-	FetchNativeTokenBalance(ctx context.Context, id, platform string) (*TokenBalance, error)
-	NativeTokenInfo(ctx context.Context) (*TokenInfo, error)
+	FetchNativeTokenBalance(ctx context.Context, id, platform string) (*types.TokenBalance, error)
+	NativeTokenInfo(ctx context.Context) (*types.TokenInfo, error)
 }
 
 // TaskManager is an interface for managing tasks
@@ -145,31 +146,10 @@ type ProcessedAction struct {
 	ActionName string `json:"action_name"`
 }
 
-// ProcessedMessage is a struct for processed messages
-type ProcessedMessage struct {
-	Intent               IntentType        `json:"intent"`
-	Entity               EntityType        `json:"entity"`
-	Emotion              EmotionType       `json:"emotion"`
-	Confidence           float64           `json:"confidence"`
-	ShouldReply          bool              `json:"should_reply"`
-	ResponseMsg          string            `json:"response_msg"`
-	ShouldGenerateAction bool              `json:"should_generate_action"`
-	Actions              []ProcessedAction `json:"actions"`
-}
-
-// SocialMessage is a struct for social messages
-type SocialMessage struct {
-	Type        string
-	Content     string
-	Platform    string
-	FromUser    string
-	TargetUsers []string
-	Metadata    map[string]interface{}
-}
-
-// SocialClient is an interface for social clients
+// SocialClient defines the interface for social media interactions
 type SocialClient interface {
-	SendMessage(ctx context.Context, message SocialMessage) error
-	GetMessageChannel() <-chan SocialMessage
+	SendMessage(ctx context.Context, msg types.SocialMessage) error
+	GetMessageChannel() <-chan types.SocialMessage
+	GetErrorChannel() <-chan error
 	MonitorMessages(ctx context.Context)
 }

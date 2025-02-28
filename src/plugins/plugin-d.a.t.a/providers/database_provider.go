@@ -319,7 +319,6 @@ func (p *DatabaseProviderImpl) ExecuteQuery(ctx context.Context, query string) (
 func (p *DatabaseProviderImpl) executeAPIRequest(ctx context.Context, sql string) (*types.APIResponse, error) {
 	logger.GetLogger().With(
 		zap.String("sql", sql),
-		zap.String("url", p.apiURL),
 	).Info("Executing API request")
 
 	// Prepare request

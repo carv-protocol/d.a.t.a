@@ -8,8 +8,8 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/carv-protocol/d.a.t.a/src/internal/core"
 	"github.com/carv-protocol/d.a.t.a/src/internal/memory"
+	"github.com/carv-protocol/d.a.t.a/src/internal/types"
 )
 
 // StakeholderManager manages stakeholder interactions and influences
@@ -29,17 +29,17 @@ func (sm *StakeholderManager) FetchOrCreateStakeholder(
 	ctx context.Context,
 	id string,
 	platform string,
-	stakeholderType core.StakeholderType,
-) (*core.Stakeholder, error) {
+	stakeholderType types.StakeholderType,
+) (*types.Stakeholder, error) {
 	key := fmt.Sprintf("%s:%s", platform, id)
-	var stakeholder *core.Stakeholder
+	var stakeholder *types.Stakeholder
 	mem, err := sm.memoryManager.GetMemory(ctx, key)
 	if err != nil {
 		return nil, err
 	}
 	// stakeholder doesn't exist
 	if mem == nil {
-		stakeholder = &core.Stakeholder{
+		stakeholder = &types.Stakeholder{
 			Key:            key,
 			ID:             id,
 			CarvID:         "",
@@ -73,7 +73,7 @@ func (sm *StakeholderManager) FetchOrCreateStakeholder(
 // AddHistoricalMsg adds a new historical message to a stakeholder's record
 func (sm *StakeholderManager) AddHistoricalMsg(ctx context.Context, id, platform string, msgs []string) error {
 	key := fmt.Sprintf("%s:%s", platform, id)
-	var stakeholder *core.Stakeholder
+	var stakeholder *types.Stakeholder
 	mem, err := sm.memoryManager.GetMemory(ctx, key)
 	if err != nil {
 		return err

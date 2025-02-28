@@ -56,8 +56,8 @@ func (r *Registry) GetPlugins() []Plugin {
 	defer r.mu.RUnlock()
 
 	plugins := make([]Plugin, 0, len(r.plugins))
-	for _, p := range r.plugins {
-		plugins = append(plugins, p)
+	for _, plugin := range r.plugins {
+		plugins = append(plugins, plugin)
 	}
 	return plugins
 }
@@ -153,18 +153,6 @@ func (r *Registry) GetProviders() []Provider {
 		providers = append(providers, p.Providers()...)
 	}
 	return providers
-}
-
-// GetEvaluators returns all evaluators from all plugins
-func (r *Registry) GetEvaluators() []Evaluator {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
-	var evaluators []Evaluator
-	for _, p := range r.plugins {
-		evaluators = append(evaluators, p.Evaluators()...)
-	}
-	return evaluators
 }
 
 // GetServices returns all services from all plugins

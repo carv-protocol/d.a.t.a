@@ -1,6 +1,7 @@
 package helper
 
 import (
+	"os"
 	"testing"
 
 	"github.com/carv-protocol/d.a.t.a/src/pkg/llm"
@@ -9,8 +10,6 @@ import (
 	"go.uber.org/zap"
 )
 
-const defaultModel = "gpt-4"
-
 // SetupTestProvider creates a test database provider
 func SetupTestProvider(t *testing.T) types.DatabaseProvider {
 	return SetupTestProviderWithLLM(t, nil)
@@ -18,10 +17,20 @@ func SetupTestProvider(t *testing.T) types.DatabaseProvider {
 
 // SetupTestProviderWithLLM creates a test database provider with a specific LLM client
 func SetupTestProviderWithLLM(t *testing.T, llmClient llm.Client) types.DatabaseProvider {
+	apiURL := os.Getenv("CARV_DATA_API_KEY")
+	if apiURL == "" {
+		t.Fatal("CARV_DATA_API_KEY environment variable is not set")
+	}
+
+	authToken := os.Getenv("CARV_DATA_AUTH_TOKEN")
+	if authToken == "" {
+		t.Fatal("CARV_DATA_AUTH_TOKEN environment variable is not set")
+	}
+
 	return providers.NewDatabaseProvider(
 		"test_provider",
-		"http://test.api",
-		"test-token",
+		apiURL,
+		authToken,
 		"ethereum",
 		"test-schema",
 		"test-examples",

@@ -6,6 +6,7 @@ import (
 	"unicode"
 
 	"github.com/carv-protocol/d.a.t.a/src/internal/actions"
+	"github.com/carv-protocol/d.a.t.a/src/internal/types"
 	pluginCore "github.com/carv-protocol/d.a.t.a/src/plugins/core"
 )
 
@@ -123,7 +124,7 @@ func formatTools(tools []Tool) string {
 	return result
 }
 
-func buildMessagePrompt(state *SystemState, msg *SocialMessage, stakeholder *Stakeholder, prompts *PromptTemplates) string {
+func buildMessagePrompt(state *SystemState, msg *types.SocialMessage, stakeholder *types.Stakeholder, prompts *PromptTemplates) string {
 	template := prompts.Message.Analysis
 	return fmt.Sprintf(
 		template,
@@ -137,14 +138,14 @@ func buildMessagePrompt(state *SystemState, msg *SocialMessage, stakeholder *Sta
 	)
 }
 
-func buildSystemPrompt(state *SystemState, stakeholder *Stakeholder, prompts *PromptTemplates) string {
+func buildSystemPrompt(state *SystemState, stakeholder *types.Stakeholder, prompts *PromptTemplates) string {
 	// Get prompt templates from config
 	baseTemplate := prompts.System.BaseTemplate
 	infoFormat := prompts.System.InfoFormat
 
 	// Format priority account info
 	priorityAccountInfo := ""
-	if stakeholder != nil && stakeholder.Type == StakeholderTypePriority {
+	if stakeholder != nil && stakeholder.Type == types.StakeholderTypePriority {
 		priorityAccountInfo = infoFormat["priority_account"]
 	}
 
@@ -186,7 +187,7 @@ func formatActions(actions []actions.IAction) string {
 	return result
 }
 
-func generateActionParametersPrompt(state *SystemState, msg *SocialMessage, stakeholder *Stakeholder, action actions.IAction, prompts *PromptTemplates) string {
+func generateActionParametersPrompt(state *SystemState, msg *types.SocialMessage, stakeholder *types.Stakeholder, action actions.IAction, prompts *PromptTemplates) string {
 	// Create a prompt that explains all the possible types and asks for structured analysis
 	template := prompts.Message.Action
 
@@ -201,7 +202,7 @@ func generateActionParametersPrompt(state *SystemState, msg *SocialMessage, stak
 	)
 }
 
-func getHistoricalMessages(stakeholder *Stakeholder) string {
+func getHistoricalMessages(stakeholder *types.Stakeholder) string {
 	if stakeholder == nil {
 		return ""
 	}

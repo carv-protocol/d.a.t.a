@@ -8,17 +8,21 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/carv-protocol/d.a.t.a/src/characters"
 	"github.com/carv-protocol/d.a.t.a/src/internal/actions"
+	"github.com/carv-protocol/d.a.t.a/src/internal/commands"
 	"github.com/carv-protocol/d.a.t.a/src/internal/core"
+	"github.com/carv-protocol/d.a.t.a/src/internal/governance"
 	"github.com/carv-protocol/d.a.t.a/src/internal/memory"
 	"github.com/carv-protocol/d.a.t.a/src/internal/social"
 	"github.com/carv-protocol/d.a.t.a/src/internal/tasks"
 	"github.com/carv-protocol/d.a.t.a/src/internal/token"
 	"github.com/carv-protocol/d.a.t.a/src/internal/tools"
+	"github.com/carv-protocol/d.a.t.a/src/internal/types"
 	"github.com/carv-protocol/d.a.t.a/src/pkg/carv"
 	"github.com/carv-protocol/d.a.t.a/src/pkg/database"
 	"github.com/carv-protocol/d.a.t.a/src/pkg/database/adapters"
@@ -97,12 +101,18 @@ func initializeAgent(ctx context.Context, config *Config) (*core.Agent, error) {
 	llmClient := llm.NewClient((*llm.LLMConfig)(&config.LLMConfig))
 	carvClient := carv.NewClient(config.Data.CarvConfig.APIKey, config.Data.CarvConfig.BaseURL)
 	memoryManager := memory.NewManager(store)
-	tokenManager := token.NewTokenManager(carvClient, &core.TokenInfo{
+	tokenManager := token.NewTokenManager(carvClient, &types.TokenInfo{
 		Network:      config.Token.Network,
 		Ticker:       config.Token.Ticker,
 		ContractAddr: config.Token.ContractAddr,
 	})
 	stakeholderManager := token.NewStakeholderManager(memoryManager)
+
+	// Initialize governance registry
+	governanceRegistry, err := initializeGovernance(config, tokenManager)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize governance: %w", err)
+	}
 
 	// Load character
 	character, err := characters.LoadFromFile(config.Character.Path)
@@ -116,10 +126,14 @@ func initializeAgent(ctx context.Context, config *Config) (*core.Agent, error) {
 	// Initialize plugins
 	pluginRegistry := initializePlugins(config)
 
-	actionManager, err := registerPlugins(ctx, pluginRegistry, config)
+	// Initialize commands
+	actionManager, err := registerPlugins(ctx, pluginRegistry, config, governanceRegistry)
 	if err != nil {
 		return nil, fmt.Errorf("failed to register plugins: %w", err)
 	}
+
+	// Initialize command manager
+	commandManager := initializeCommands(config, governanceRegistry, llmClient)
 
 	promptTemplates := config.UserTemplates
 	if config.UserTemplates == nil {
@@ -134,24 +148,63 @@ func initializeAgent(ctx context.Context, config *Config) (*core.Agent, error) {
 		Model:        config.LLMConfig.Model,
 		Stakeholders: stakeholderManager,
 		ToolsManager: toolsManager,
+		TokenManager: tokenManager,
 		SocialClient: social.NewSocialClient(
 			&config.Social.TwitterConfig,
 			&config.Social.DiscordConfig,
 			&config.Social.TelegramConfig,
 		),
+		ActionManager:   actionManager,
+		PluginRegistry:  pluginRegistry,
+		CommandManager:  commandManager,
 		PromptTemplates: promptTemplates,
 		TaskManager:     tasks.NewManager(tasks.NewTaskStore(store)),
-		ActionManager:   actionManager,
-		TokenManager:    tokenManager,
-		PluginRegistry:  pluginRegistry,
 	}
 
-	agent, err := core.NewAgent(agentConfig)
+	return core.NewAgent(agentConfig)
+}
+
+// initializeGovernance initializes the governance registry with platform-specific configurations
+func initializeGovernance(config *Config, tokenManager *token.TokenManager) (governance.Registry, error) {
+	// Initialize governance registry
+	governanceRegistry := governance.NewMemoryRegistry(tokenManager)
+
+	// Set up admin configuration from config
+	adminConfig := &governance.AdminConfig{
+		Admins:          config.Governance.DefaultAdminIDs,
+		MinTokenBalance: config.Governance.DefaultMinTokenBalance,
+		PlatformConfigs: make(map[string]*governance.PlatformConfig),
+	}
+
+	// Add platform-specific configurations
+	if config.Governance.Discord != nil {
+		adminConfig.PlatformConfigs["discord"] = &governance.PlatformConfig{
+			Admins:          config.Governance.Discord.AdminIDs,
+			MinTokenBalance: config.Governance.Discord.MinTokenBalance,
+		}
+	}
+
+	if config.Governance.Twitter != nil {
+		adminConfig.PlatformConfigs["twitter"] = &governance.PlatformConfig{
+			Admins:          config.Governance.Twitter.AdminIDs,
+			MinTokenBalance: config.Governance.Twitter.MinTokenBalance,
+		}
+	}
+
+	if config.Governance.Telegram != nil {
+		adminConfig.PlatformConfigs["telegram"] = &governance.PlatformConfig{
+			Admins:          config.Governance.Telegram.AdminIDs,
+			MinTokenBalance: config.Governance.Telegram.MinTokenBalance,
+		}
+	}
+
+	// Update the governance registry with the admin configuration
+	err := governanceRegistry.UpdateAdminConfig(adminConfig)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create agent: %w", err)
+		return nil, fmt.Errorf("failed to update admin config: %v", err)
 	}
 
-	return agent, nil
+	return governanceRegistry, nil
 }
 
 func initializeTools(config *Config) *tools.Manager {
@@ -190,8 +243,17 @@ func initializePlugins(config *Config) *pluginCore.Registry {
 			continue
 		}
 
-		// Get plugin factory
-		factory, exists := builtinPlugins[name]
+		// Get plugin factory - case insensitive matching
+		var factory pluginCore.PluginFactory
+		var exists bool
+		for builtinName, builtinFactory := range builtinPlugins {
+			if strings.EqualFold(name, builtinName) {
+				factory = builtinFactory
+				exists = true
+				break
+			}
+		}
+
 		if !exists {
 			log.Printf("Plugin %s not found in built-in plugins", name)
 			continue
@@ -216,32 +278,65 @@ func initializePlugins(config *Config) *pluginCore.Registry {
 	return registry
 }
 
-// returns the action manager
-func registerPlugins(ctx context.Context, pluginRegistry *pluginCore.Registry, config *Config) (actions.ActionManager, error) {
+func initializeCommands(config *Config, governanceRegistry governance.Registry, llmClient llm.Client) *commands.Registry {
+	commandManager := commands.NewRegistry()
+	commands.InitializeCommands(commandManager, governanceRegistry, llmClient, config.LLMConfig.Model, social.NewSocialClient(
+		&config.Social.TwitterConfig,
+		&config.Social.DiscordConfig,
+		&config.Social.TelegramConfig,
+	))
+	return commandManager
+}
+
+// registerPlugins initializes and starts all plugins, then registers their actions
+func registerPlugins(ctx context.Context, pluginRegistry *pluginCore.Registry, config *Config, governanceRegistry governance.Registry) (actions.ActionManager, error) {
 	// Initialize each plugin with its own options
-	for name, pluginConfig := range config.Plugin.Plugins {
+	for configName, pluginConfig := range config.Plugin.Plugins {
 		if !pluginConfig.Enabled {
 			continue
 		}
 
-		// Check if plugin is registered
-		if _, exists := pluginRegistry.GetPlugin(name); !exists {
-			log.Printf("Plugin %s is not registered, skipping initialization", name)
+		// Find registered plugin (case insensitive)
+		var plugin pluginCore.Plugin
+		var found bool
+		for _, p := range pluginRegistry.GetPlugins() {
+			if strings.EqualFold(p.Name(), configName) {
+				plugin = p
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			log.Printf("Plugin %s is not registered, skipping initialization", configName)
 			continue
 		}
 
-		if err := pluginRegistry.InitPlugin(ctx, name, pluginConfig.Options); err != nil {
-			return nil, fmt.Errorf("failed to initialize plugin %s: %w", name, err)
+		// Prepare plugin options (copy original configuration options)
+		pluginOptions := make(map[string]interface{})
+		for k, v := range pluginConfig.Options {
+			pluginOptions[k] = v
+		}
+
+		// Add special dependencies for d.a.t.aGovernance
+		if strings.EqualFold(plugin.Name(), "d.a.t.aGovernance") {
+			pluginOptions["governance_registry"] = governanceRegistry
+		}
+		// Future can add special dependencies for other plugins here
+
+		// Initialize plugin
+		if err := pluginRegistry.InitPlugin(ctx, plugin.Name(), pluginOptions); err != nil {
+			return nil, fmt.Errorf("failed to initialize plugin %s: %w", plugin.Name(), err)
 		}
 	}
 
+	// Start all plugins
 	if err := pluginRegistry.StartAll(ctx); err != nil {
 		return nil, fmt.Errorf("failed to start plugins: %w", err)
 	}
 
 	// Initialize action manager and register actions
 	actionManager := actions.NewManager()
-
 	for _, pluginAction := range pluginRegistry.GetActions() {
 		log.Printf("Registering action %s", pluginAction.Name())
 		adapter := pluginCore.NewActionAdapter(ctx, pluginAction)
@@ -269,7 +364,7 @@ func checkPluginDependencies(config PluginConfig, plugins map[string]PluginConfi
 
 // verifyPluginMetadata verifies that plugin metadata matches configuration
 func verifyPluginMetadata(plugin pluginCore.Plugin, config PluginConfig) error {
-	if plugin.Name() != config.Name {
+	if !strings.EqualFold(plugin.Name(), config.Name) {
 		return fmt.Errorf("plugin name mismatch: got %s, want %s", plugin.Name(), config.Name)
 	}
 	if plugin.Version() != config.Version {

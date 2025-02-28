@@ -6,6 +6,7 @@ import (
 
 	"github.com/carv-protocol/d.a.t.a/src/characters"
 	"github.com/carv-protocol/d.a.t.a/src/internal/actions"
+	"github.com/carv-protocol/d.a.t.a/src/internal/commands"
 	"github.com/carv-protocol/d.a.t.a/src/pkg/llm"
 	pluginCore "github.com/carv-protocol/d.a.t.a/src/plugins/core"
 	"github.com/google/uuid"
@@ -25,6 +26,7 @@ type AgentConfig struct {
 	SocialClient    SocialClient
 	PromptTemplates *PromptTemplates
 	PluginRegistry  *pluginCore.Registry
+	CommandManager  *commands.Registry
 	Training        struct {
 		Enabled       bool
 		MaxIterations int

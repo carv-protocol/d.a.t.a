@@ -2,6 +2,8 @@ package core
 
 import (
 	"context"
+
+	"github.com/carv-protocol/d.a.t.a/src/internal/actions"
 )
 
 // Plugin defines the interface that all plugins must implement
@@ -14,7 +16,6 @@ type Plugin interface {
 	// Components
 	Actions() []Action
 	Providers() []Provider
-	Evaluators() []Evaluator
 	Services() []Service
 	Clients() []Client
 
@@ -81,13 +82,60 @@ type Provider interface {
 	GetProviderState(ctx context.Context) (*ProviderState, error)
 }
 
-// Evaluator defines the interface for plugin evaluators
-type Evaluator interface {
-	// Name returns the unique name of the evaluator
-	Name() string
+// SystemState represents the interface for system state
+type SystemState interface {
+	GetCharacter() interface{}
+	GetAvailableTools() []interface{}
+	GetAvailableActions() []actions.IAction
+	GetAvailableEvaluators() []Evaluator
+	GetStakeholderPreferences() map[string]interface{}
+	GetActiveProviderStates() []*ProviderState
+}
 
-	// Evaluate performs evaluation with given parameters
-	Evaluate(ctx context.Context, params map[string]interface{}) (interface{}, error)
+// SocialMessage represents the interface for social messages
+type SocialMessage interface {
+	GetPlatform() string
+	GetFromUser() string
+	GetContent() string
+	GetMetadata() map[string]interface{}
+}
+
+// Stakeholder represents the interface for stakeholders
+type Stakeholder interface {
+	GetID() string
+	GetType() string
+	GetTokenBalance() interface{}
+	GetHistoricalMsgs() []string
+}
+
+// EvaluationContext contains all the context needed for evaluation
+type EvaluationContext struct {
+	Action           actions.IAction
+	State            SystemState
+	Message          SocialMessage
+	Stakeholder      Stakeholder
+	ResponseMsg      string
+	AvailableActions []actions.IAction
+}
+
+// EvaluationResult contains the result of an evaluation
+type EvaluationResult struct {
+	// Whether the response message should be modified
+	ShouldModifyResponse bool
+	// The modified response message if ShouldModifyResponse is true
+	ModifiedResponse string
+	// Additional actions suggested by the evaluator
+	SuggestedActions []actions.IAction
+	// Parameters for the suggested actions
+	ActionParams map[string]interface{}
+}
+
+// Evaluator interface defines methods that must be implemented by evaluators
+type Evaluator interface {
+	// Name returns the name of the evaluator
+	Name() string
+	// Evaluate evaluates the current state and returns an evaluation result
+	Evaluate(ctx context.Context, evalCtx *EvaluationContext) (*EvaluationResult, error)
 }
 
 // Service defines the interface for plugin services

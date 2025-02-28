@@ -38,6 +38,14 @@ type Config struct {
 		clients.TelegramConfig `mapstructure:"telegram"`
 	} `mapstructure:"social"`
 
+	Governance struct {
+		DefaultAdminIDs        []string                  `mapstructure:"admin_ids"`
+		DefaultMinTokenBalance float64                   `mapstructure:"min_token_balance"`
+		Discord                *PlatformGovernanceConfig `mapstructure:"discord"`
+		Twitter                *PlatformGovernanceConfig `mapstructure:"twitter"`
+		Telegram               *PlatformGovernanceConfig `mapstructure:"telegram"`
+	} `mapstructure:"governance"`
+
 	Token struct {
 		Network      string `mapstructure:"network"`
 		Ticker       string `mapstructure:"ticker"`
@@ -56,6 +64,11 @@ type Config struct {
 	Plugin struct {
 		Plugins map[string]PluginConfig `mapstructure:"plugins"`
 	} `mapstructure:"plugin"`
+}
+
+type PlatformGovernanceConfig struct {
+	AdminIDs        []string `mapstructure:"admin_ids"`
+	MinTokenBalance float64  `mapstructure:"min_token_balance"`
 }
 
 type PluginConfig struct {
