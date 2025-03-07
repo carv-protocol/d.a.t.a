@@ -4,6 +4,7 @@ package core
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/carv-protocol/d.a.t.a/src/characters"
@@ -18,6 +19,7 @@ import (
 type Agent struct {
 	ID             uuid.UUID
 	cognitive      *CognitiveEngine
+	commandManager CommandRegistry
 	character      *characters.Character
 	logger         *zap.SugaredLogger
 	stakeholders   StakeholderManager
@@ -51,6 +53,7 @@ func NewAgent(config AgentConfig) (*Agent, error) {
 		ID:             config.ID,
 		character:      config.Character,
 		cognitive:      NewCognitiveEngine(config.LLMClient, config.Model, config.Character, config.PromptTemplates),
+		commandManager: config.CommandRegistry,
 		logger:         logger.GetLogger(),
 		stakeholders:   config.Stakeholders,
 		tokenManager:   config.TokenManager,
@@ -143,16 +146,66 @@ func (a *Agent) getCurrentState() *SystemState {
 // Social media monitoring
 func (a *Agent) monitorSocialInputs() {
 	msgQueue := a.socialClient.GetMessageChannel()
-	// TODO graceful shutdown
 	go a.socialClient.MonitorMessages(a.ctx)
 	for {
 		select {
 		case msg := <-msgQueue:
-			a.processMessage(&msg)
+			// Route message to appropriate handler based on type
+			if len(msg.Content) > 0 && msg.Content[0] == '/' {
+				if err := a.processCommand(&msg); err != nil {
+					a.logger.Errorw("Error processing command", "error", err)
+				}
+			} else {
+				if err := a.processMessage(&msg); err != nil {
+					a.logger.Errorw("Error processing message", "error", err)
+				}
+			}
 		case <-a.ctx.Done():
 			return
 		}
 	}
+}
+
+// processCommand handles command messages starting with '/'
+func (a *Agent) processCommand(msg *SocialMessage) error {
+	a.logger.Infof("Processing command: %s", msg.Content)
+	if a.commandManager == nil {
+		a.logger.Warn("Command manager is not initialized")
+		return nil
+	}
+
+	// Get the command name (first word after /)
+	args := strings.Fields(msg.Content)
+	if len(args) == 0 {
+		return nil
+	}
+	cmdName := args[0][1:] // Remove leading '/' from first word
+
+	cmd, exists := a.commandManager.Get(cmdName)
+	if !exists {
+		a.logger.Warnw("Command not found", "command", cmdName)
+		a.socialClient.SendMessage(a.ctx, SocialMessage{
+			Platform: msg.Platform,
+			Type:     "Response",
+			Content:  fmt.Sprintf("Command not found: `%s`. Use `/help` to see available commands.", cmdName),
+			Metadata: msg.Metadata,
+		})
+		return nil
+	}
+
+	if err := cmd.Execute(a.ctx, msg); err != nil {
+		a.logger.Errorw("Failed to execute command", "command", cmdName, "error", err)
+		return err
+	}
+
+	a.socialClient.SendMessage(a.ctx, SocialMessage{
+		Platform: msg.Platform,
+		Type:     "Response",
+		Content:  msg.Content,
+		Metadata: msg.Metadata,
+	})
+
+	return nil
 }
 
 // executeAction executes a generic action
