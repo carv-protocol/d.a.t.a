@@ -3,7 +3,7 @@ package handlers
 import (
 	"context"
 
-	"github.com/carv-protocol/d.a.t.a/src/internal/types"
+	"github.com/carv-protocol/d.a.t.a/src/internal/core"
 )
 
 type SettingsCommand struct{}
@@ -16,7 +16,7 @@ func (s *SettingsCommand) Description() string {
 	return "🚧 Under construction 🚧 - Manage user settings"
 }
 
-func (s *SettingsCommand) Execute(ctx context.Context, msg *types.SocialMessage) error {
+func (s *SettingsCommand) Execute(ctx context.Context, msg *core.SocialMessage) error {
 	msg.Content = "Settings preferences feature is not implemented yet."
 	return nil
 }

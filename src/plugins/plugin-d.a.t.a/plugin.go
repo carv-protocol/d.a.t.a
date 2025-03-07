@@ -4,19 +4,15 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/carv-protocol/d.a.t.a/src/internal/actions"
+	"github.com/carv-protocol/d.a.t.a/src/internal/plugins"
 	"github.com/carv-protocol/d.a.t.a/src/pkg/llm"
 	"github.com/carv-protocol/d.a.t.a/src/pkg/logger"
-	"github.com/carv-protocol/d.a.t.a/src/plugins/core"
-	"github.com/carv-protocol/d.a.t.a/src/plugins/plugin-d.a.t.a/actions"
+	walletactions "github.com/carv-protocol/d.a.t.a/src/plugins/plugin-d.a.t.a/actions"
 	"github.com/carv-protocol/d.a.t.a/src/plugins/plugin-d.a.t.a/providers"
-	"github.com/carv-protocol/d.a.t.a/src/plugins/plugin-d.a.t.a/types"
+
 	"go.uber.org/zap"
 )
-
-// init registers the plugin factory
-func init() {
-	core.RegisterPlugin("d.a.t.a", NewPlugin)
-}
 
 // Required configuration keys
 const (
@@ -26,74 +22,111 @@ const (
 	ConfigKeyLLM       = "llm"        // LLM configuration section
 )
 
-// Plugin implements the core.Plugin interface for data functionality
-type Plugin struct {
-	config    *core.PluginConfig
-	llmClient llm.Client
-	logger    *zap.SugaredLogger
-	actions   []core.Action
-	providers []core.Provider
-	services  []core.Service
-	clients   []core.Client
+// dataPlugin implements the core.Plugin interface for data functionality
+type dataPlugin struct {
+	llmClient  llm.Client
+	metadata   plugins.PluginMetadata
+	logger     *zap.SugaredLogger
+	actions    []actions.IAction
+	providers  []plugins.Provider
+	evaluators []plugins.Evaluator
+	services   []plugins.Service
 }
 
 // NewPlugin creates a new data plugin
-func NewPlugin(llmClient llm.Client) core.Plugin {
-	return &Plugin{
-		llmClient: llmClient,
-		logger:    logger.GetLogger().With(zap.String("plugin", "d.a.t.a")),
-		config: &core.PluginConfig{
-			Metadata: core.PluginMetadata{
-				Name:        "d.a.t.a",
-				Description: "Data interaction plugin",
-				Version:     "1.0.0",
-				Author:      "CARV Protocol",
-				License:     "MIT",
-				Homepage:    "https://github.com/carv-protocol/d.a.t.a",
-				Repository:  "https://github.com/carv-protocol/d.a.t.a",
-			},
-			Options: make(map[string]interface{}),
-		},
+func NewPlugin(llmClient llm.Client, config *plugins.Config) (plugins.Plugin, error) {
+	logger := logger.GetLogger().With(zap.String("plugin", "d.a.t.a"))
+
+	if err := validateConfig(config.Options); err != nil {
+		return nil, fmt.Errorf("invalid plugin configuration: %w", err)
 	}
+
+	// Initialize provider
+	llmConfig, ok := config.Options[ConfigKeyLLM].(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("invalid LLM configuration type: expected map[string]interface{}")
+	}
+
+	model, ok := llmConfig["model"].(string)
+	if !ok || model == "" {
+		return nil, fmt.Errorf("invalid or missing model in LLM configuration")
+	}
+
+	// Create provider using factory
+	provider := providers.NewDatabaseProvider(
+		"ethereum_database_provider",
+		config.Options[ConfigKeyAPIURL].(string),
+		config.Options[ConfigKeyAuthToken].(string),
+		config.Options[ConfigKeyChain].(string),
+		getDefaultDatabaseSchema(),
+		getDefaultQueryExamples(),
+		llmClient,
+		model,
+		logger,
+	)
+
+	// Create action using factory
+	action := walletactions.NewFetchTransactionAction(provider)
+
+	return &dataPlugin{
+		llmClient: llmClient,
+		logger:    logger,
+		providers: []plugins.Provider{provider},
+		actions:   []actions.IAction{action},
+		metadata: plugins.PluginMetadata{
+			Name:        "d.a.t.a",
+			Description: "Data interaction plugin",
+			Version:     "1.0.0",
+			Author:      "CARV Protocol",
+			License:     "MIT",
+			Homepage:    "https://github.com/carv-protocol/d.a.t.a",
+			Repository:  "https://github.com/carv-protocol/d.a.t.a",
+		},
+	}, nil
 }
 
 // Name implements core.Plugin interface
-func (p *Plugin) Name() string {
-	return p.config.Metadata.Name
+func (p *dataPlugin) Name() string {
+	return p.metadata.Name
 }
 
 // Description implements core.Plugin interface
-func (p *Plugin) Description() string {
-	return p.config.Metadata.Description
+func (p *dataPlugin) Description() string {
+	return p.metadata.Description
 }
 
 // Version implements core.Plugin interface
-func (p *Plugin) Version() string {
-	return p.config.Metadata.Version
+func (p *dataPlugin) Version() string {
+	return p.metadata.Version
 }
 
 // Actions implements core.Plugin interface
-func (p *Plugin) Actions() []core.Action {
+func (p *dataPlugin) Actions() []actions.IAction {
 	return p.actions
 }
 
 // Providers implements core.Plugin interface
-func (p *Plugin) Providers() []core.Provider {
+func (p *dataPlugin) Providers() []plugins.Provider {
 	return p.providers
 }
 
+// Evaluators implements core.Plugin interface
+func (p *dataPlugin) Evaluators() []plugins.Evaluator {
+	return p.evaluators
+}
+
 // Services implements core.Plugin interface
-func (p *Plugin) Services() []core.Service {
+func (p *dataPlugin) Services() []plugins.Service {
 	return p.services
 }
 
 // Clients implements core.Plugin interface
-func (p *Plugin) Clients() []core.Client {
-	return p.clients
+func (p *dataPlugin) Init(ctx context.Context) error {
+	return nil
 }
 
 // validateConfig validates the plugin configuration
-func (p *Plugin) validateConfig(opts map[string]interface{}) error {
+func validateConfig(opts map[string]interface{}) error {
 	required := []string{ConfigKeyAPIURL, ConfigKeyAuthToken, ConfigKeyChain, ConfigKeyLLM}
 	for _, key := range required {
 		val, ok := opts[key]
@@ -127,143 +160,8 @@ func (p *Plugin) validateConfig(opts map[string]interface{}) error {
 	return nil
 }
 
-// DatabaseProviderAdapter adapts DatabaseProvider to core.Provider interface
-type DatabaseProviderAdapter struct {
-	provider types.DatabaseProvider
-	logger   *zap.SugaredLogger
-}
-
-func (a *DatabaseProviderAdapter) Name() string {
-	return "ethereum_database_provider"
-}
-
-func (a *DatabaseProviderAdapter) Type() string {
-	return "database"
-}
-
-func (a *DatabaseProviderAdapter) GetProviderState(ctx context.Context) (*core.ProviderState, error) {
-	providerImpl, ok := a.provider.(*providers.DatabaseProviderImpl)
-	if !ok {
-		return nil, fmt.Errorf("invalid provider type: expected *DatabaseProviderImpl")
-	}
-	return providerImpl.GetProviderState(ctx)
-}
-
-func (a *DatabaseProviderAdapter) GetData(ctx context.Context, params map[string]interface{}) (interface{}, error) {
-	return a.provider.ProcessQuery(ctx, params)
-}
-
-// FetchTransactionActionAdapter adapts FetchTransactionAction to core.Action interface
-type FetchTransactionActionAdapter struct {
-	action core.FetchTransactionAction
-	logger *zap.SugaredLogger
-}
-
-func NewFetchTransactionActionAdapter(action core.FetchTransactionAction, logger *zap.SugaredLogger) *FetchTransactionActionAdapter {
-	return &FetchTransactionActionAdapter{
-		action: action,
-		logger: logger,
-	}
-}
-
-func (a *FetchTransactionActionAdapter) Name() string {
-	return a.action.Name()
-}
-
-func (a *FetchTransactionActionAdapter) Description() string {
-	return a.action.Description()
-}
-
-func (a *FetchTransactionActionAdapter) Type() string {
-	return a.action.Type()
-}
-
-func (a *FetchTransactionActionAdapter) Execute(ctx context.Context, params map[string]interface{}) (interface{}, error) {
-	a.logger.Infow("Executing fetch transaction action", "params", params)
-	result, err := a.action.Execute(ctx, params)
-	if err != nil {
-		a.logger.Errorw("Failed to execute fetch transaction action", "error", err)
-		return nil, err
-	}
-	a.logger.Infow("Fetch transaction action executed successfully", "result", result)
-	return result, nil
-}
-
-// GetAction returns the underlying FetchTransactionAction
-func (a *FetchTransactionActionAdapter) GetAction() core.FetchTransactionAction {
-	return a.action
-}
-
-// Init implements core.Plugin interface
-func (p *Plugin) Init(ctx context.Context, opts map[string]interface{}) error {
-	// Store configuration
-	if p.config == nil {
-		p.config = &core.PluginConfig{
-			Options: make(map[string]interface{}),
-		}
-	}
-
-	// Merge options
-	for k, v := range opts {
-		p.config.Options[k] = v
-	}
-
-	// Validate configuration
-	if err := p.validateConfig(p.config.Options); err != nil {
-		p.logger.Errorw("Failed to validate configuration", "error", err)
-		return fmt.Errorf("invalid configuration: %w", err)
-	}
-
-	// Initialize provider
-	llmConfig, ok := p.config.Options[ConfigKeyLLM].(map[string]interface{})
-	if !ok {
-		// Try converting from map[interface{}]interface{}
-		llmConfig2, ok := p.config.Options[ConfigKeyLLM].(map[interface{}]interface{})
-		if !ok {
-			return fmt.Errorf("invalid LLM configuration type: expected map[string]interface{} or map[interface{}]interface{}")
-		}
-		// Convert to map[string]interface{}
-		llmConfig = make(map[string]interface{})
-		for k, v := range llmConfig2 {
-			if kStr, ok := k.(string); ok {
-				llmConfig[kStr] = v
-			}
-		}
-	}
-
-	model, ok := llmConfig["model"].(string)
-	if !ok || model == "" {
-		return fmt.Errorf("invalid or missing model in LLM configuration")
-	}
-
-	// Create provider using factory
-	provider := providers.NewDatabaseProvider(
-		"ethereum_database_provider",
-		p.config.Options[ConfigKeyAPIURL].(string),
-		p.config.Options[ConfigKeyAuthToken].(string),
-		p.config.Options[ConfigKeyChain].(string),
-		getDefaultDatabaseSchema(),
-		getDefaultQueryExamples(),
-		p.llmClient,
-		model,
-		p.logger,
-	)
-	providerAdapter := &DatabaseProviderAdapter{
-		provider: provider,
-		logger:   p.logger,
-	}
-	p.providers = append(p.providers, providerAdapter)
-
-	// Create action using factory
-	action := actions.NewFetchTransactionAction(provider)
-	actionAdapter := NewFetchTransactionActionAdapter(action, p.logger)
-	p.actions = append(p.actions, actionAdapter)
-
-	return nil
-}
-
 // Start implements core.Plugin interface
-func (p *Plugin) Start(ctx context.Context) error {
+func (p *dataPlugin) Start(ctx context.Context) error {
 	// Start all services
 	for _, service := range p.services {
 		if err := service.Start(ctx); err != nil {
@@ -275,23 +173,12 @@ func (p *Plugin) Start(ctx context.Context) error {
 		}
 	}
 
-	// Connect all clients
-	for _, client := range p.clients {
-		if err := client.Connect(ctx); err != nil {
-			p.logger.Errorw("Failed to connect client",
-				"client", client.Name(),
-				"error", err,
-			)
-			return fmt.Errorf("failed to connect client %s: %w", client.Name(), err)
-		}
-	}
-
 	p.logger.Info("d.a.t.a plugin started successfully")
 	return nil
 }
 
 // Stop implements core.Plugin interface
-func (p *Plugin) Stop(ctx context.Context) error {
+func (p *dataPlugin) Stop(ctx context.Context) error {
 	p.logger.Info("Stopping data plugin")
 
 	var errs []error
@@ -304,17 +191,6 @@ func (p *Plugin) Stop(ctx context.Context) error {
 				"error", err,
 			)
 			errs = append(errs, fmt.Errorf("failed to stop service %s: %w", service.Name(), err))
-		}
-	}
-
-	// Close all clients
-	for _, client := range p.clients {
-		if err := client.Close(ctx); err != nil {
-			p.logger.Errorw("Failed to close client",
-				"client", client.Name(),
-				"error", err,
-			)
-			errs = append(errs, fmt.Errorf("failed to close client %s: %w", client.Name(), err))
 		}
 	}
 

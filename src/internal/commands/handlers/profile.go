@@ -3,7 +3,7 @@ package handlers
 import (
 	"context"
 
-	"github.com/carv-protocol/d.a.t.a/src/internal/types"
+	"github.com/carv-protocol/d.a.t.a/src/internal/core"
 )
 
 type ProfileCommand struct{}
@@ -16,7 +16,7 @@ func (p *ProfileCommand) Description() string {
 	return "🚧 Under construction 🚧 - View and edit user profile"
 }
 
-func (p *ProfileCommand) Execute(ctx context.Context, msg *types.SocialMessage) error {
+func (p *ProfileCommand) Execute(ctx context.Context, msg *core.SocialMessage) error {
 	msg.Content = "Profile feature is not implemented yet."
 	return nil
 }

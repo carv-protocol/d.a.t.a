@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/carv-protocol/d.a.t.a/src/internal/types"
+	"github.com/carv-protocol/d.a.t.a/src/internal/core"
 )
 
 type HelpCommand struct {
@@ -28,7 +28,7 @@ func (h *HelpCommand) Description() string {
 	return "Display available commands and their descriptions"
 }
 
-func (h *HelpCommand) Execute(ctx context.Context, msg *types.SocialMessage) error {
+func (h *HelpCommand) Execute(ctx context.Context, msg *core.SocialMessage) error {
 	// Parse arguments to check if a specific command is requested
 	args := strings.Fields(msg.Content)
 	if len(args) > 1 {
@@ -92,7 +92,7 @@ func (h *HelpCommand) Execute(ctx context.Context, msg *types.SocialMessage) err
 }
 
 // showCommandHelp displays detailed help for a specific command
-func (h *HelpCommand) showCommandHelp(ctx context.Context, msg *types.SocialMessage, commandName string) error {
+func (h *HelpCommand) showCommandHelp(ctx context.Context, msg *core.SocialMessage, commandName string) error {
 	// Get the command
 	cmd, found := h.registry.Get(commandName)
 	if !found {

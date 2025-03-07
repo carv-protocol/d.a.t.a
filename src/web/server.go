@@ -2,8 +2,6 @@ package web
 
 import (
 	"context"
-	"github.com/carv-protocol/d.a.t.a/src/pkg/logger"
-	"github.com/gin-gonic/gin"
 	"net"
 	"net/http"
 	"net/http/httputil"
@@ -12,6 +10,11 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/carv-protocol/d.a.t.a/src/pkg/logger"
+
+	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 )
 
 var (
@@ -38,10 +41,10 @@ func Stop() {
 
 func newServer(port int) *http.Server {
 
-	gin.SetMode(gin.DebugMode)
+	gin.SetMode(gin.ReleaseMode)
 
-	r := gin.Default()
-	r.Use(GinRecovery(true))
+	r := gin.New()
+	r.Use(GinRecovery(true), ZapLogger(logger.GetLogger()))
 
 	r.Any("/talk", Talk)
 	r.GET("/healthy", Healthy)
@@ -83,5 +86,16 @@ func GinRecovery(stack bool) gin.HandlerFunc {
 			}
 		}()
 		c.Next()
+	}
+}
+
+func ZapLogger(logger *zap.SugaredLogger) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		start := time.Now()
+		c.Next()
+		logger.Infof(
+			"Request handled, method: %s | path: %s | status: %d | duration: %s",
+			c.Request.Method, c.Request.URL.Path, c.Writer.Status(), time.Since(start),
+		)
 	}
 }

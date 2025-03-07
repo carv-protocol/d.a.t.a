@@ -55,13 +55,13 @@ func (sm *StakeholderManager) FetchOrCreateStakeholder(
 		err = sm.memoryManager.CreateMemory(ctx, memory.Memory{
 			MemoryID:  key,
 			CreatedAt: time.Now(),
-			Content:   res,
+			Content:   string(res),
 		})
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		err = json.Unmarshal(mem.Content, &stakeholder)
+		err = json.Unmarshal([]byte(mem.Content), &stakeholder)
 		if err != nil {
 			return nil, err
 		}
@@ -82,7 +82,7 @@ func (sm *StakeholderManager) AddHistoricalMsg(ctx context.Context, id, platform
 		return fmt.Errorf("stakeholder doesn't exist")
 	}
 
-	err = json.Unmarshal(mem.Content, &stakeholder)
+	err = json.Unmarshal([]byte(mem.Content), &stakeholder)
 	if err != nil {
 		return err
 	}
@@ -98,7 +98,7 @@ func (sm *StakeholderManager) AddHistoricalMsg(ctx context.Context, id, platform
 	return sm.memoryManager.SetMemory(ctx, &memory.Memory{
 		MemoryID:  mem.MemoryID,
 		CreatedAt: mem.CreatedAt,
-		Content:   res,
+		Content:   string(res),
 	})
 }
 

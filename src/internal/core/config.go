@@ -5,10 +5,10 @@ import (
 	"time"
 
 	"github.com/carv-protocol/d.a.t.a/src/characters"
-	"github.com/carv-protocol/d.a.t.a/src/internal/actions"
-	"github.com/carv-protocol/d.a.t.a/src/internal/commands"
+	"github.com/carv-protocol/d.a.t.a/src/internal/conf"
+	"github.com/carv-protocol/d.a.t.a/src/internal/plugins"
 	"github.com/carv-protocol/d.a.t.a/src/pkg/llm"
-	pluginCore "github.com/carv-protocol/d.a.t.a/src/plugins/core"
+
 	"github.com/google/uuid"
 )
 
@@ -18,15 +18,12 @@ type AgentConfig struct {
 	Character       *characters.Character
 	LLMClient       llm.Client
 	Model           string
-	TaskManager     TaskManager
-	ActionManager   actions.ActionManager
-	ToolsManager    ToolManager
 	Stakeholders    StakeholderManager
 	TokenManager    TokenManager
 	SocialClient    SocialClient
-	PromptTemplates *PromptTemplates
-	PluginRegistry  *pluginCore.Registry
-	CommandManager  *commands.Registry
+	CommandRegistry CommandRegistry
+	PromptTemplates *conf.PromptTemplates
+	PluginRegistry  *plugins.Registry
 	Training        struct {
 		Enabled       bool
 		MaxIterations int

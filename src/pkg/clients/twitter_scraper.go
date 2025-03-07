@@ -5,18 +5,20 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/carv-protocol/d.a.t.a/src/internal/conf"
+
 	twitterscraper "github.com/tyxben/twitter-scraper"
 )
 
 // TwitterScraper represents a Twitter scraper using browser automation
 type TwitterScraper struct {
 	scraper *twitterscraper.Scraper
-	config  *TwitterConfig
+	config  *conf.TwitterConfig
 	userID  string // Store logged in user's ID
 }
 
 // NewTwitterScraper creates a new Twitter scraper with improved error handling and validation
-func newTwitterScraper(config *TwitterConfig) (*TwitterScraper, error) {
+func newTwitterScraper(config *conf.TwitterConfig) (*TwitterScraper, error) {
 	// Validate config
 	if err := validateConfig(config); err != nil {
 		return nil, fmt.Errorf("invalid twitter config: %w", err)

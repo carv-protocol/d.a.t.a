@@ -9,11 +9,6 @@ import (
 	"time"
 )
 
-type CarvConfig struct {
-	APIKey  string `mapstructure:"api_key"`
-	BaseURL string `mapstructure:"base_url"`
-}
-
 type Client struct {
 	APIKey     string
 	BaseURL    string

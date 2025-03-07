@@ -1,0 +1,135 @@
+linters:
+  enable:
+    # Basic code quality checks
+    - gofmt        # Check code format
+    - goimports    # Check and fix imports
+    - gci          # Check import grouping
+    - govet        # Report suspicious code constructs
+    - errcheck     # Check for unchecked errors
+    - staticcheck  # Static analysis checks
+    - gosimple     # Simplify code suggestions
+    - ineffassign  # Detect ineffective assignments
+    - unused       # Check for unused code
+    
+    # Code style checks
+    - lll          # Line length limit
+    - funlen       # Function length limit
+    - gocyclo      # Cyclomatic complexity check
+    - cyclop       # Cyclomatic complexity check (alternative implementation)
+    - nestif       # Nested conditionals check
+    - godot        # Check if comments end with a period
+    - misspell     # Spelling check
+    - whitespace   # Whitespace check
+    
+    # Security checks
+    - gosec        # Security check
+    
+    # Performance checks
+    - bodyclose    # Check if HTTP response bodies are closed
+    - noctx        # Check if context is passed
+    
+    # Other useful checks
+    - dupl         # Code duplication check
+    - goconst      # Find strings that could be constants
+    - gocritic     # Provides various code checks
+    - errorlint    # Error handling check
+    - revive       # Code check ruleset
+    - unconvert    # Remove unnecessary type conversions
+    - unparam      # Find unused function parameters
+
+linters-settings:
+  lll:
+    # Maximum line length of 110 characters
+    line-length: 110
+  
+  gci:
+    # Group imports into standard library, project packages, and third-party packages
+    sections:
+      - standard # Go standard library
+      - prefix(github.com/carv-protocol/d.a.t.a) # Project packages
+      - default # Third-party packages
+  
+  # Note: The gofmt rewrite-rules for comma formatting were removed due to compatibility issues
+  # The comma formatting rule (each comma on a new line) will be enforced through code reviews
+  
+  funlen:
+    # Maximum function length limits
+    lines: 80
+    statements: 50
+  
+  gocyclo:
+    # Maximum cyclomatic complexity
+    min-complexity: 15
+  
+  cyclop:
+    # Alternative cyclomatic complexity check
+    max-complexity: 15
+    
+  nestif:
+    # Maximum nesting depth for conditionals
+    min-complexity: 5
+    
+  godot:
+    # Ensure all comments end with a period
+    scope: all
+    
+  misspell:
+    # Check for commonly misspelled English words
+    locale: US
+    
+  dupl:
+    # Threshold for code duplication detection
+    threshold: 100
+    
+  goconst:
+    # Settings for detecting strings that could be constants
+    min-len: 2
+    min-occurrences: 3
+    
+  gocritic:
+    # Enable all categories of checks
+    enabled-tags:
+      - diagnostic
+      - experimental
+      - opinionated
+      - performance
+      - style
+      
+  errorlint:
+    # Error handling checks
+    errorf: true
+    asserts: true
+    comparison: true
+
+issues:
+  exclude-rules:
+    # Exclude some rules for test files
+    - path: _test\.go
+      linters:
+        - funlen
+        - lll
+        - gocyclo
+        - cyclop
+        - dupl
+    
+    # Exclude generated files
+    - path: \.pb\.go
+      linters:
+        - all
+    
+    # Exclude mocks
+    - path: mock_.*\.go
+      linters:
+        - all
+
+run:
+  timeout: 5m
+  
+  # Run linters in parallel
+  concurrency: 4
+  
+  # Allow parallel runners
+  allow-parallel-runners: true
+  
+  # Note: The following configuration may not be supported in some versions of golangci-lint
+  # If you encounter problems, please adjust or remove these configurations according to your golangci-lint version 

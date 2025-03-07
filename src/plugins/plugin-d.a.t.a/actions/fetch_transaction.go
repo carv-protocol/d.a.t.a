@@ -6,12 +6,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/carv-protocol/d.a.t.a/src/plugins/core"
+	"github.com/carv-protocol/d.a.t.a/src/internal/actions"
 	"github.com/carv-protocol/d.a.t.a/src/plugins/plugin-d.a.t.a/types"
 )
 
 // Ensure FetchTransactionAction implements core.FetchTransactionAction
-var _ core.FetchTransactionAction = (*FetchTransactionAction)(nil)
+var _ actions.IAction = (*FetchTransactionAction)(nil)
 
 // FetchTransactionAction represents the action for fetching transactions
 type FetchTransactionAction struct {
@@ -48,53 +48,62 @@ func NewFetchTransactionAction(dbProvider types.DatabaseProvider) *FetchTransact
 	}
 }
 
+func (a *FetchTransactionAction) ParametersPrompt() string {
+	return `
+	# Parameters:
+	- startDate: string
+	- endDate: string
+	- address: string
+	- orderBy: string
+	- orderDirection: string
+	- limit: int
+	`
+}
+
+func (a *FetchTransactionAction) Validate(params map[string]interface{}) error {
+	// TODO: validate the parameters
+
+	return nil
+}
+
 // Execute implements the Action interface
-func (a *FetchTransactionAction) Execute(ctx context.Context, params map[string]interface{}) (interface{}, error) {
+// TODO: fix this function
+func (a *FetchTransactionAction) Execute(ctx context.Context, params map[string]interface{}) error {
 	// Get message content from params
 	message, ok := params["message"].(string)
 	if !ok {
-		return nil, fmt.Errorf("message parameter is required")
+		return fmt.Errorf("message parameter is required")
 	}
 
 	// Generate query from message
 	query, err := a.GenerateQuery(ctx, message)
-	fmt.Printf("Generated Query: %s\n", query)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate query: %w", err)
+		return fmt.Errorf("failed to generate query: %w", err)
 	}
 
 	// Execute query with parameters
-	result, err := a.ExecuteWithParams(ctx, query, params)
+	err = a.ExecuteWithParams(ctx, query, params)
 	if err != nil {
-		return nil, fmt.Errorf("failed to execute query: %w", err)
+		return fmt.Errorf("failed to execute query: %w", err)
 	}
 
-	// Ensure result is of correct type
-	if result == nil {
-		return nil, nil
-	}
-
-	queryResult, ok := result.(*types.TransactionQueryResult)
-	if !ok {
-		return nil, fmt.Errorf("unexpected result type: %T", result)
-	}
-
-	return queryResult, nil
+	return nil
 }
 
 // ExecuteWithParams executes the action with specific parameters
-func (a *FetchTransactionAction) ExecuteWithParams(ctx context.Context, query string, params map[string]interface{}) (interface{}, error) {
+// TODO: fix this function
+func (a *FetchTransactionAction) ExecuteWithParams(ctx context.Context, query string, params map[string]interface{}) error {
 	// 1. execute the query
 	result, err := a.dbProvider.ExecuteQuery(ctx, query)
 	if err != nil {
-		return nil, fmt.Errorf("failed to execute query: %w", err)
+		return fmt.Errorf("failed to execute query: %w", err)
 	}
 
 	// 2. analyze the result
 	analysis, err := a.dbProvider.AnalyzeQuery(ctx, result)
 	if err != nil {
 		// if the analysis failed, still return the original result
-		return result, nil
+		return nil
 	}
 
 	// 3. add the analysis result
@@ -108,7 +117,7 @@ func (a *FetchTransactionAction) ExecuteWithParams(ctx context.Context, query st
 		Query: query,
 	}
 
-	return result, nil
+	return nil
 }
 
 func (a *FetchTransactionAction) Name() string {

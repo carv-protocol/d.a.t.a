@@ -4,16 +4,10 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/carv-protocol/d.a.t.a/src/internal/conf"
 	"github.com/carv-protocol/d.a.t.a/src/pkg/llm/deepseek"
 	"github.com/carv-protocol/d.a.t.a/src/pkg/llm/openai"
 )
-
-type LLMConfig struct {
-	Provider string `mapstructure:"provider"`
-	APIKey   string `mapstructure:"api_key"`
-	BaseURL  string `mapstructure:"base_url"`
-	Model    string `mapstructure:"model"`
-}
 
 type State struct {
 	Prompt string
@@ -57,7 +51,7 @@ func (c *clientImpl) CreateCompletion(ctx context.Context, request CompletionReq
 	}
 }
 
-func NewClient(conf *LLMConfig) Client {
+func NewClient(conf *conf.LLMConfig) Client {
 	client := &clientImpl{
 		provider: conf.Provider,
 		model:    conf.Model,

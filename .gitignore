@@ -14,3 +14,5 @@ d.a.t.a
 config
 main
 data/*
+local
+data

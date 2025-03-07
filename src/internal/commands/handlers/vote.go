@@ -2,24 +2,29 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"strings"
 
-	"github.com/google/uuid"
-
+	"github.com/carv-protocol/d.a.t.a/src/characters"
+	"github.com/carv-protocol/d.a.t.a/src/internal/core"
 	"github.com/carv-protocol/d.a.t.a/src/internal/governance"
-	"github.com/carv-protocol/d.a.t.a/src/internal/types"
-	"github.com/carv-protocol/d.a.t.a/src/internal/utils"
+
+	"github.com/google/uuid"
 )
 
 type VoteCommand struct {
 	governanceRegistry governance.Registry
+	character          *characters.Character
+	agent              CharacterUpdater
 }
 
-func NewVoteCommand(registry governance.Registry) *VoteCommand {
+func NewVoteCommand(registry governance.Registry, character *characters.Character, agent CharacterUpdater) *VoteCommand {
 	return &VoteCommand{
 		governanceRegistry: registry,
+		character:          character,
+		agent:              agent,
 	}
 }
 
@@ -31,9 +36,9 @@ func (v *VoteCommand) Description() string {
 	return "Participate in voting"
 }
 
-func (v *VoteCommand) Execute(ctx context.Context, msg *types.SocialMessage) error {
+func (v *VoteCommand) Execute(ctx context.Context, msg *core.SocialMessage) error {
 	// Parse command arguments
-	args := utils.ParseCommandArgs(msg.Content)
+	args := ParseCommandArgs(msg.Content)
 	log.Printf("VoteCommand received message: %s", msg.Content)
 	log.Printf("Parsed arguments: %#v", args)
 
@@ -102,8 +107,7 @@ func (v *VoteCommand) Execute(ctx context.Context, msg *types.SocialMessage) err
 	return nil
 }
 
-func (v *VoteCommand) handleTally(ctx context.Context, msg *types.SocialMessage, proposalIDStr string) error {
-	// Parse proposal ID
+func (v *VoteCommand) handleTally(ctx context.Context, msg *core.SocialMessage, proposalIDStr string) error {
 	proposalID, err := uuid.Parse(proposalIDStr)
 	if err != nil {
 		msg.Content = fmt.Sprintf("Invalid proposal ID: %v", err)
@@ -117,42 +121,95 @@ func (v *VoteCommand) handleTally(ctx context.Context, msg *types.SocialMessage,
 		return nil
 	}
 
-	// Get current tally
+	// Get voting results
 	tally, err := v.governanceRegistry.TallyVotes(ctx, proposalID)
 	if err != nil {
 		msg.Content = fmt.Sprintf("Failed to tally votes: %v", err)
 		return nil
 	}
 
-	// Calculate total votes
-	totalVotes := tally[governance.VoteOptionYes] + tally[governance.VoteOptionNo]
-
-	// Calculate percentages
-	var yesPercent, noPercent float64
-	if totalVotes > 0 {
-		yesPercent = (tally[governance.VoteOptionYes] / totalVotes) * 100
-		noPercent = (tally[governance.VoteOptionNo] / totalVotes) * 100
+	// Check if proposal has ended
+	if proposal.Status == governance.ProposalStatusActive {
+		msg.Content = fmt.Sprintf("Current Results:\nYes: %.2f\nNo: %.2f",
+			tally[governance.VoteOptionYes],
+			tally[governance.VoteOptionNo],
+		)
+		return nil
 	}
 
-	msg.Content = fmt.Sprintf(`Voting Results for Proposal:
-Title: %s
-ID: %s
-Status: %s
+	// If this is a character modification proposal and it passed, apply the changes
+	if proposal.Status == governance.ProposalStatusPassed && proposal.Type == governance.ProposalTypeCharacter {
+		if err := v.applyCharacterModification(ctx, proposal); err != nil {
+			msg.Content = fmt.Sprintf("Failed to apply character modification: %v", err)
+			return nil
+		}
+	}
 
-Total Votes: %.0f
-Yes: %.0f (%.2f%%)
-No: %.0f (%.2f%%)`,
-		proposal.Title,
-		proposal.ID.String(),
+	msg.Content = fmt.Sprintf("Final Results:\nStatus: %s\nYes: %.2f\nNo: %.2f",
 		proposal.Status,
-		totalVotes,
-		tally[governance.VoteOptionYes], yesPercent,
-		tally[governance.VoteOptionNo], noPercent,
+		tally[governance.VoteOptionYes],
+		tally[governance.VoteOptionNo],
 	)
 	return nil
 }
 
-func (v *VoteCommand) handleList(ctx context.Context, msg *types.SocialMessage, proposalIDStr string) error {
+func (v *VoteCommand) applyCharacterModification(ctx context.Context, proposal *governance.Proposal) error {
+	if proposal.Modification == nil {
+		return fmt.Errorf("no modification details found in proposal")
+	}
+
+	// Create a copy of the current character
+	newCharacter := v.character
+
+	// Apply the modification
+	switch proposal.Modification.Field {
+	case "name":
+		newCharacter.Name = proposal.Modification.Value.(string)
+	case "system":
+		newCharacter.System = proposal.Modification.Value.(string)
+	case "bio", "lore", "topics":
+		values := strings.Split(proposal.Modification.Value.(string), ",")
+		switch proposal.Modification.Field {
+		case "bio":
+			newCharacter.Bio = values
+		case "lore":
+			newCharacter.Lore = values
+		case "topics":
+			newCharacter.Topics = values
+		}
+	case "style_tone", "style_constraints":
+		values := strings.Split(proposal.Modification.Value.(string), ",")
+		switch proposal.Modification.Field {
+		case "style_tone":
+			newCharacter.Style.Tone = values
+		case "style_constraints":
+			newCharacter.Style.Constraints = values
+		}
+	case "goals":
+		var goals []characters.Goal
+		if err := json.Unmarshal([]byte(proposal.Modification.Value.(string)), &goals); err != nil {
+			return fmt.Errorf("failed to parse goals: %w", err)
+		}
+		newCharacter.Goals = goals
+	default:
+		return fmt.Errorf("unknown field: %s", proposal.Modification.Field)
+	}
+
+	// // Save the new character to a proposal-specific file
+	// proposalPath := filepath.Join("src", "config", fmt.Sprintf("character_data_agent_%s.json", proposal.ID))
+	// if err := newCharacter.SaveToPath(proposalPath); err != nil {
+	// 	return fmt.Errorf("failed to save character: %w", err)
+	// }
+
+	// // Update the agent's character
+	// if err := v.agent.UpdateCharacter(newCharacter); err != nil {
+	// 	return fmt.Errorf("failed to update agent character: %w", err)
+	// }
+
+	return nil
+}
+
+func (v *VoteCommand) handleList(ctx context.Context, msg *core.SocialMessage, proposalIDStr string) error {
 	// Parse proposal ID
 	proposalID, err := uuid.Parse(proposalIDStr)
 	if err != nil {
@@ -204,19 +261,19 @@ func (v *VoteCommand) Examples() []string {
 	return []string{
 		"/vote 123e4567-e89b-12d3-a456-426614174000 yes",
 		"/vote 123e4567-e89b-12d3-a456-426614174000 no",
-		"/vote 123e4567-e89b-12d3-a456-426614174000 yes  # 投票支持提案",
-		"/vote 123e4567-e89b-12d3-a456-426614174000 no   # 投票反对提案",
-		"/vote tally 123e4567-e89b-12d3-a456-426614174000  # 统计投票结果",
-		"/vote list 123e4567-e89b-12d3-a456-426614174000   # 列出所有投票",
+		"/vote 123e4567-e89b-12d3-a456-426614174000 yes",
+		"/vote 123e4567-e89b-12d3-a456-426614174000 no",
+		"/vote tally 123e4567-e89b-12d3-a456-426614174000",
+		"/vote list 123e4567-e89b-12d3-a456-426614174000",
 	}
 }
 
 // GetSubcommands returns a list of available subcommands with descriptions
 func (v *VoteCommand) GetSubcommands() map[string]string {
 	return map[string]string{
-		"<proposal_id> yes":   "对指定提案投赞成票",
-		"<proposal_id> no":    "对指定提案投反对票",
-		"tally <proposal_id>": "统计指定提案的投票结果",
-		"list <proposal_id>":  "列出指定提案的所有投票",
+		"<proposal_id> yes":   "Vote yes for the proposal",
+		"<proposal_id> no":    "Vote no for the proposal",
+		"tally <proposal_id>": "Tally the votes for the proposal",
+		"list <proposal_id>":  "List all votes for the proposal",
 	}
 }

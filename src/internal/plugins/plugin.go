@@ -1,6 +1,10 @@
 package plugins
 
-import "context"
+import (
+	"context"
+
+	"github.com/carv-protocol/d.a.t.a/src/internal/actions"
+)
 
 // Plugin defines behavior for extending D.A.T.A
 // Hook Event Summary:
@@ -23,7 +27,80 @@ import "context"
 
 // Plugin interface
 type Plugin interface {
-	Initialize(ctx context.Context) error
-	Execute(ctx context.Context, event string, data interface{}) error
 	Name() string
+	Description() string
+	Providers() []Provider
+	Actions() []actions.IAction
+	Evaluators() []Evaluator
+}
+
+// Provider interface defines methods that must be implemented by all providers
+type Provider interface {
+	// Name returns the name of the provider
+	Name() string
+
+	// Type returns the type of the provider
+	Type() string
+
+	// GetState returns the current state of the provider
+	GetProviderState(ctx context.Context) (*ProviderState, error)
+}
+
+// ProviderState represents the current state of a provider
+type ProviderState struct {
+	// Name of the provider
+	Name string `json:"name"`
+
+	// Type of the provider
+	Type string `json:"type"`
+
+	// Current state of the provider
+	State string `json:"state"`
+
+	// Additional metadata specific to the provider type
+	Metadata map[string]interface{} `json:"metadata"`
+
+	// Any error state
+	Error string `json:"error,omitempty"`
+}
+
+// Evaluator defines the interface for plugin evaluators
+type Evaluator interface {
+	// Name returns the unique name of the evaluator
+	Name() string
+
+	// Evaluate performs evaluation with given parameters
+	Evaluate(ctx context.Context, params map[string]interface{}) (interface{}, error)
+}
+
+// Service defines the interface for plugin services
+type Service interface {
+	// Name returns the unique name of the service
+	Name() string
+
+	// Start starts the service
+	Start(ctx context.Context) error
+
+	// Stop stops the service
+	Stop(ctx context.Context) error
+}
+
+// PluginMetadata contains plugin metadata
+type PluginMetadata struct {
+	Name        string
+	Description string
+	Version     string
+	Author      string
+	License     string
+	Homepage    string
+	Repository  string
+}
+
+// Config contains plugin configuration
+type Config struct {
+	Name        string `mapstructure:"name"`
+	Description string `mapstructure:"description"`
+
+	// Plugin options
+	Options map[string]interface{} `mapstructure:"options"`
 }

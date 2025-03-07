@@ -10,10 +10,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/carv-protocol/d.a.t.a/src/internal/plugins"
 	"github.com/carv-protocol/d.a.t.a/src/pkg/llm"
 	"github.com/carv-protocol/d.a.t.a/src/pkg/logger"
-	"github.com/carv-protocol/d.a.t.a/src/plugins/core"
 	"github.com/carv-protocol/d.a.t.a/src/plugins/plugin-d.a.t.a/types"
+
 	"go.uber.org/zap"
 )
 
@@ -521,8 +522,8 @@ func (p *DatabaseProviderImpl) Type() string {
 }
 
 // GetProviderState returns the current state of the provider
-func (p *DatabaseProviderImpl) GetProviderState(ctx context.Context) (*core.ProviderState, error) {
-	state := &core.ProviderState{
+func (p *DatabaseProviderImpl) GetProviderState(ctx context.Context) (*plugins.ProviderState, error) {
+	state := &plugins.ProviderState{
 		Name:  p.Name(),
 		Type:  p.Type(),
 		State: "connected", // Default state since we don't maintain persistent connections

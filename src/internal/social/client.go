@@ -6,8 +6,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/carv-protocol/d.a.t.a/src/internal/types"
+	"github.com/carv-protocol/d.a.t.a/src/internal/conf"
+	"github.com/carv-protocol/d.a.t.a/src/internal/core"
 	"github.com/carv-protocol/d.a.t.a/src/pkg/clients"
+	"github.com/carv-protocol/d.a.t.a/src/pkg/logger"
 )
 
 // SocialClientImpl handles social media interactions and error reporting
@@ -15,18 +17,18 @@ type SocialClientImpl struct {
 	twitterClient    clients.ITwitter
 	discordBot       *clients.DiscordBot
 	telegramBot      *clients.TelegramClient
-	socialMsgChannel chan types.SocialMessage
+	socialMsgChannel chan core.SocialMessage
 	errorChannel     chan error // Channel for reporting errors to agent
 }
 
 // NewSocialClient creates a new social client with error handling
 func NewSocialClient(
-	twitterConfig *clients.TwitterConfig,
-	discordConfig *clients.DiscordConfig,
-	telegramConfig *clients.TelegramConfig,
+	twitterConfig *conf.TwitterConfig,
+	discordConfig *conf.DiscordConfig,
+	telegramConfig *conf.TelegramConfig,
 ) *SocialClientImpl {
 	cli := &SocialClientImpl{
-		socialMsgChannel: make(chan types.SocialMessage),
+		socialMsgChannel: make(chan core.SocialMessage),
 		errorChannel:     make(chan error, 100), // Buffered channel to prevent blocking
 	}
 	if twitterConfig != nil && twitterConfig.Mode != "" {
@@ -50,23 +52,16 @@ func NewSocialClient(
 	return cli
 }
 
-func (sc *SocialClientImpl) SendMessage(ctx context.Context, msg types.SocialMessage) error {
-	fmt.Printf("Sending message to platform %s with metadata: %#v\n", msg.Platform, msg.Metadata)
-
+func (sc *SocialClientImpl) SendMessage(ctx context.Context, msg core.SocialMessage) error {
 	switch msg.Platform {
 	case "twitter":
 		return sc.twitterClient.Tweet(ctx, msg.Content)
 	case "discord":
-		if channelID, ok := msg.Metadata["channel_id"].(string); ok {
-			fmt.Printf("Sending Discord message to channel: %s\n", channelID)
-			return sc.discordBot.SendMessage(ctx, &clients.DiscordMsg{
-				AuthorID:  msg.FromUser,
-				Content:   msg.Content,
-				ChannelID: channelID,
-			})
-		} else {
-			return fmt.Errorf("missing or invalid channel_id in metadata for Discord message")
-		}
+		return sc.discordBot.SendMessage(ctx, &clients.DiscordMsg{
+			AuthorID:  msg.FromUser,
+			Content:   msg.Content,
+			ChannelID: msg.Metadata["channel_id"].(string),
+		})
 	case "telegram":
 		return sc.telegramBot.BroadcastMessage(ctx, msg.Content)
 	case "all":
@@ -101,12 +96,13 @@ func (sc *SocialClientImpl) SendMessage(ctx context.Context, msg types.SocialMes
 		}
 	default:
 		return fmt.Errorf("invalid platform: %s", msg.Platform)
+
 	}
 
 	return nil
 }
 
-func (sc *SocialClientImpl) GetMessageChannel() <-chan types.SocialMessage {
+func (sc *SocialClientImpl) GetMessageChannel() <-chan core.SocialMessage {
 	return sc.socialMsgChannel
 }
 
@@ -161,14 +157,14 @@ func (sc *SocialClientImpl) monitorTwitter(ctx context.Context) {
 					// Error successfully reported
 				default:
 					// Channel is full, log locally
-					fmt.Printf("Error channel full, dropping error: %v\n", err)
+					logger.GetLogger().Errorf("Error channel full, dropping error: %v", err)
 				}
 				//not return here, continue monitoring
 				continue
 			}
 
 			for _, tweet := range tweets {
-				sc.socialMsgChannel <- types.SocialMessage{
+				sc.socialMsgChannel <- core.SocialMessage{
 					Type:        "mention",
 					Content:     tweet.Text,
 					Platform:    "twitter",
@@ -188,7 +184,7 @@ func (sc *SocialClientImpl) monitorDiscord(ctx context.Context) {
 	for {
 		select {
 		case msg := <-channel:
-			sc.socialMsgChannel <- types.SocialMessage{
+			sc.socialMsgChannel <- core.SocialMessage{
 				Type:     "message",
 				Content:  msg.Content,
 				Platform: "discord",
@@ -205,7 +201,7 @@ func (sc *SocialClientImpl) monitorDiscord(ctx context.Context) {
 func (sc *SocialClientImpl) monitorTelegram(ctx context.Context) {
 	// Start the Telegram listener
 	if err := sc.telegramBot.StartListener(ctx); err != nil {
-		fmt.Printf("Failed to start Telegram listener: %v\n", err)
+		logger.GetLogger().Errorf("Failed to start Telegram listener: %v", err)
 		return
 	}
 
@@ -217,7 +213,7 @@ func (sc *SocialClientImpl) monitorTelegram(ctx context.Context) {
 		select {
 		case msg := <-channel:
 			// Convert TelegramMessage to core.SocialMessage
-			socialMsg := types.SocialMessage{
+			socialMsg := core.SocialMessage{
 				Type:     "message",
 				Content:  msg.Text,
 				Platform: "telegram",

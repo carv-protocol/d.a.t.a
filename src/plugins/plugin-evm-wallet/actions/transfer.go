@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/carv-protocol/d.a.t.a/src/tools/wallet/actions/clients"
+	"github.com/carv-protocol/d.a.t.a/src/plugins/plugin-evm-wallet/actions/clients"
 )
 
 type TransferAction struct {

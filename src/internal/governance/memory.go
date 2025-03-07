@@ -6,7 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/carv-protocol/d.a.t.a/src/internal/types"
+	"github.com/carv-protocol/d.a.t.a/src/internal/core"
+
 	"github.com/google/uuid"
 )
 
@@ -291,7 +292,7 @@ func (r *MemoryRegistry) GetMinTokenBalanceForPlatform(platform string) float64 
 	return r.adminConfig.MinTokenBalance // Fall back to global setting
 }
 
-func (r *MemoryRegistry) GetTokenBalance(ctx context.Context, userID string, platform string) (*types.TokenBalance, error) {
+func (r *MemoryRegistry) GetTokenBalance(ctx context.Context, userID string, platform string) (*core.TokenBalance, error) {
 	return r.tokenManager.FetchNativeTokenBalance(ctx, userID, platform)
 }
 

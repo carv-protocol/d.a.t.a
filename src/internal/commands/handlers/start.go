@@ -3,11 +3,11 @@ package handlers
 import (
 	"context"
 
-	"github.com/carv-protocol/d.a.t.a/src/internal/types"
+	"github.com/carv-protocol/d.a.t.a/src/internal/core"
 )
 
 // StartHandler handles the /start command
-func StartHandler(ctx context.Context, msg *types.SocialMessage) error {
+func StartHandler(ctx context.Context, msg *core.SocialMessage) error {
 	msg.Content = "Welcome to the command system! Type /help to see available commands."
 	return nil
 }
@@ -22,7 +22,7 @@ func (s *StartCommand) Description() string {
 	return "🚧 Under construction 🚧 - Start system or feature"
 }
 
-func (s *StartCommand) Execute(ctx context.Context, msg *types.SocialMessage) error {
+func (s *StartCommand) Execute(ctx context.Context, msg *core.SocialMessage) error {
 	msg.Content = "Start feature is not implemented yet."
 	return nil
 }

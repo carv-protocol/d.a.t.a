@@ -26,18 +26,35 @@ const (
 	VoteOptionAbstain VoteOption = "ABSTAIN"
 )
 
+// ProposalType represents the type of proposal
+type ProposalType string
+
+const (
+	ProposalTypeGeneral   ProposalType = "GENERAL"
+	ProposalTypeCharacter ProposalType = "CHARACTER"
+)
+
+// CharacterModification represents the changes to be made to the character
+type CharacterModification struct {
+	Field      string      `json:"field"`
+	Value      interface{} `json:"value"`
+	ProposalID uuid.UUID   `json:"proposal_id"`
+}
+
 // Proposal represents a governance proposal
 type Proposal struct {
-	ID          uuid.UUID      `json:"id"`
-	Title       string         `json:"title"`
-	Description string         `json:"description"`
-	Creator     string         `json:"creator"`
-	Platform    string         `json:"platform"`
-	Status      ProposalStatus `json:"status"`
-	StartTime   time.Time      `json:"start_time"`
-	EndTime     time.Time      `json:"end_time"`
-	CreatedAt   time.Time      `json:"created_at"`
-	UpdatedAt   time.Time      `json:"updated_at"`
+	ID           uuid.UUID              `json:"id"`
+	Title        string                 `json:"title"`
+	Description  string                 `json:"description"`
+	Creator      string                 `json:"creator"`
+	Platform     string                 `json:"platform"`
+	Status       ProposalStatus         `json:"status"`
+	Type         ProposalType           `json:"type"`
+	Modification *CharacterModification `json:"modification,omitempty"`
+	StartTime    time.Time              `json:"start_time"`
+	EndTime      time.Time              `json:"end_time"`
+	CreatedAt    time.Time              `json:"created_at"`
+	UpdatedAt    time.Time              `json:"updated_at"`
 }
 
 // Vote represents a vote cast on a proposal

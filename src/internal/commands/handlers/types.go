@@ -3,7 +3,7 @@ package handlers
 import (
 	"context"
 
-	"github.com/carv-protocol/d.a.t.a/src/internal/types"
+	"github.com/carv-protocol/d.a.t.a/src/internal/core"
 )
 
 // Command defines the basic information of a command
@@ -12,7 +12,7 @@ type Command interface {
 	Description() string
 	Usage() string
 	Examples() []string
-	Execute(ctx context.Context, msg *types.SocialMessage) error
+	Execute(ctx context.Context, msg *core.SocialMessage) error
 }
 
 // SubcommandProvider defines a command that has subcommands

@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/carv-protocol/d.a.t.a/src/internal/governance"
+
 	"github.com/google/uuid"
 )
 

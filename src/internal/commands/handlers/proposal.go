@@ -2,16 +2,18 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/carv-protocol/d.a.t.a/src/characters"
+	"github.com/carv-protocol/d.a.t.a/src/internal/core"
 	"github.com/carv-protocol/d.a.t.a/src/internal/governance"
-	"github.com/carv-protocol/d.a.t.a/src/internal/types"
-	"github.com/carv-protocol/d.a.t.a/src/internal/utils"
 	"github.com/carv-protocol/d.a.t.a/src/pkg/llm"
+
 	"github.com/google/uuid"
 )
 
@@ -19,15 +21,17 @@ type ProposalCommand struct {
 	governanceRegistry governance.Registry
 	llmClient          llm.Client
 	model              string
-	messageSender      types.MessageSender
+	messageSender      MessageSender
+	character          *characters.Character
 }
 
-func NewProposalCommand(registry governance.Registry, llmClient llm.Client, model string, messageSender types.MessageSender) *ProposalCommand {
+func NewProposalCommand(registry governance.Registry, llmClient llm.Client, model string, messageSender MessageSender, character *characters.Character) *ProposalCommand {
 	return &ProposalCommand{
 		governanceRegistry: registry,
 		llmClient:          llmClient,
 		model:              model,
 		messageSender:      messageSender,
+		character:          character,
 	}
 }
 
@@ -39,8 +43,8 @@ func (p *ProposalCommand) Description() string {
 	return "Create and manage governance proposals"
 }
 
-func (p *ProposalCommand) Execute(ctx context.Context, msg *types.SocialMessage) error {
-	args := utils.ParseCommandArgs(msg.Content)
+func (p *ProposalCommand) Execute(ctx context.Context, msg *core.SocialMessage) error {
+	args := ParseCommandArgs(msg.Content)
 	log.Printf("ProposalCommand received message: %s", msg.Content)
 	log.Printf("Parsed arguments: %#v", args)
 
@@ -62,13 +66,15 @@ func (p *ProposalCommand) Execute(ctx context.Context, msg *types.SocialMessage)
 		return p.handleAdmin(ctx, msg, args[1:])
 	case "force-end":
 		return p.handleForceEnd(ctx, msg, args[1:])
+	case "character":
+		return p.handleCharacter(ctx, msg, args[1:])
 	default:
-		msg.Content = fmt.Sprintf("Unknown subcommand: '%s'. Available subcommands: create, list, get, admin, force-end", args[0])
+		msg.Content = fmt.Sprintf("Unknown subcommand: '%s'. Available subcommands: create, list, get, admin, force-end, character", args[0])
 		return nil
 	}
 }
 
-func (p *ProposalCommand) handleCreate(ctx context.Context, msg *types.SocialMessage, args []string) error {
+func (p *ProposalCommand) handleCreate(ctx context.Context, msg *core.SocialMessage, args []string) error {
 	log.Printf("handleCreate received args: %#v", args)
 	log.Printf("User ID: %s, Platform: %s", msg.FromUser, msg.Platform)
 
@@ -139,7 +145,7 @@ func (p *ProposalCommand) handleCreate(ctx context.Context, msg *types.SocialMes
 	return nil
 }
 
-func (p *ProposalCommand) handleList(ctx context.Context, msg *types.SocialMessage, args []string) error {
+func (p *ProposalCommand) handleList(ctx context.Context, msg *core.SocialMessage, args []string) error {
 	log.Printf("Starting handleList with args: %#v", args)
 	log.Printf("Message metadata: %#v", msg.Metadata)
 
@@ -265,7 +271,7 @@ Keep the analysis concise and focused on the most important points.`, summary.St
 			if i > 0 {
 				chunk = fmt.Sprintf("(Continued %d/%d)\n%s", i+1, len(chunks), chunk)
 			}
-			err = p.messageSender.SendMessage(ctx, types.SocialMessage{
+			err = p.messageSender.SendMessage(ctx, core.SocialMessage{
 				Platform: msg.Platform,
 				Type:     "Response",
 				Content:  chunk,
@@ -328,7 +334,7 @@ func splitMessage(msg string, maxLength int) []string {
 	return chunks
 }
 
-func (p *ProposalCommand) handleGet(ctx context.Context, msg *types.SocialMessage, args []string) error {
+func (p *ProposalCommand) handleGet(ctx context.Context, msg *core.SocialMessage, args []string) error {
 	if len(args) < 1 {
 		msg.Content = "Invalid get command format. Usage: /proposal get <proposal_id>"
 		return nil
@@ -397,7 +403,7 @@ No: %.2f`,
 	return nil
 }
 
-func (p *ProposalCommand) handleAdmin(ctx context.Context, msg *types.SocialMessage, args []string) error {
+func (p *ProposalCommand) handleAdmin(ctx context.Context, msg *core.SocialMessage, args []string) error {
 	// Check if user is admin
 	if !p.governanceRegistry.IsAdmin(msg.FromUser) {
 		msg.Content = "Only administrators can use admin commands."
@@ -458,7 +464,7 @@ func (p *ProposalCommand) handleAdmin(ctx context.Context, msg *types.SocialMess
 	return nil
 }
 
-func (p *ProposalCommand) handleForceEnd(ctx context.Context, msg *types.SocialMessage, args []string) error {
+func (p *ProposalCommand) handleForceEnd(ctx context.Context, msg *core.SocialMessage, args []string) error {
 	// Check if user is admin
 	if !p.governanceRegistry.IsAdmin(msg.FromUser) {
 		msg.Content = "Only administrators can force end proposals."
@@ -495,6 +501,137 @@ func (p *ProposalCommand) handleForceEnd(ctx context.Context, msg *types.SocialM
 	return nil
 }
 
+func (p *ProposalCommand) handleCharacter(ctx context.Context, msg *core.SocialMessage, args []string) error {
+	// Check if user is admin
+	if !p.governanceRegistry.IsAdmin(msg.FromUser) {
+		msg.Content = "Only administrators can propose character modifications."
+		return nil
+	}
+
+	if len(args) < 2 {
+		msg.Content = `Usage: /proposal character <field> <new_value>
+
+Available fields:
+- name: Set the character's name (string)
+  Example: /proposal character name "Love Oracle"
+
+- system: Set the character's system prompt (string)
+  Example: /proposal character system "A friendly AI assistant focused on relationship advice"
+
+- bio: Set the character's biography (comma-separated list)
+  Example: /proposal character bio "Expert in relationship counseling,Created by CARV team"
+
+- lore: Set the character's background lore (comma-separated list)
+  Example: /proposal character lore "Born in digital realm,Trained by relationship experts"
+
+- style_tone: Set the character's tone of voice (comma-separated list)
+  Example: /proposal character style_tone "friendly,empathetic,professional"
+
+- style_constraints: Set the character's behavioral constraints (comma-separated list)
+  Example: /proposal character style_constraints "Never judge,Always be supportive"
+
+- topics: Set the character's expertise topics (comma-separated list)
+  Example: /proposal character topics "relationships,dating,marriage"
+
+- goals: Set the character's goals with priorities (format: description:priority,description:priority)
+  Example: /proposal character goals "Help users improve relationships:1.0,Provide actionable advice:0.8"
+
+Note: All proposals require voting to pass before changes take effect.
+Use '/vote <proposal_id> yes/no' to vote on proposals.`
+		return nil
+	}
+
+	field := strings.ToLower(args[0])
+	value := args[1]
+
+	// Validate field
+	switch field {
+	case "name", "system":
+		// Simple string fields, no validation needed
+	case "bio", "lore", "topics":
+		// Array fields, split by comma
+		value = strings.Join(strings.Split(value, ","), ",")
+	case "style_tone", "style_constraints":
+		// Style guide fields, split by comma
+		value = strings.Join(strings.Split(value, ","), ",")
+	case "goals":
+		// Parse goals in format: description1:priority1,description2:priority2
+		goals := make([]characters.Goal, 0)
+		for _, goalStr := range strings.Split(value, ",") {
+			parts := strings.Split(goalStr, ":")
+			if len(parts) != 2 {
+				msg.Content = "Invalid goal format. Use: description:priority"
+				return nil
+			}
+			priority, err := strconv.ParseFloat(parts[1], 64)
+			if err != nil {
+				msg.Content = fmt.Sprintf("Invalid priority value: %v", err)
+				return nil
+			}
+			goals = append(goals, characters.Goal{
+				Description: parts[0],
+				Priority:    priority,
+			})
+		}
+		// Convert goals to JSON for storage
+		goalsJSON, err := json.Marshal(goals)
+		if err != nil {
+			msg.Content = fmt.Sprintf("Failed to encode goals: %v", err)
+			return nil
+		}
+		value = string(goalsJSON)
+	default:
+		msg.Content = fmt.Sprintf("Unknown field: '%s'. Available fields: name, system, bio, lore, style_tone, style_constraints, topics, goals", field)
+		return nil
+	}
+
+	// Create a character modification proposal
+	title := fmt.Sprintf("Character Modification: %s", field)
+	description := fmt.Sprintf("Modify character field '%s' to: %s", field, value)
+
+	// Calculate start and end times
+	now := time.Now()
+	startTimeUnix := now.Unix()
+	endTimeUnix := now.Add(24 * time.Hour).Unix() // 24 hour voting period
+
+	// Create the proposal
+	proposal, err := p.governanceRegistry.CreateProposal(
+		ctx,
+		title,
+		description,
+		msg.FromUser,
+		msg.Platform,
+		startTimeUnix,
+		endTimeUnix,
+	)
+	if err != nil {
+		msg.Content = fmt.Sprintf("Failed to create proposal: %v", err)
+		return nil
+	}
+
+	// Add character modification details
+	proposal.Type = governance.ProposalTypeCharacter
+	proposal.Modification = &governance.CharacterModification{
+		Field:      field,
+		Value:      value,
+		ProposalID: proposal.ID,
+	}
+
+	// Update proposal with modification details
+	err = p.governanceRegistry.UpdateProposalStatus(ctx, proposal.ID, governance.ProposalStatusActive)
+	if err != nil {
+		msg.Content = fmt.Sprintf("Failed to activate proposal: %v", err)
+		return nil
+	}
+
+	msg.Content = fmt.Sprintf("Character modification proposal created successfully!\nID: %s\nField: %s\nValue: %s\nVoting Period: 24 hours\nUse '/vote <proposal_id> yes/no' to vote",
+		proposal.ID.String(),
+		field,
+		value,
+	)
+	return nil
+}
+
 func (p *ProposalCommand) Usage() string {
 	return "/proposal <subcommand> [arguments]"
 }
@@ -508,6 +645,13 @@ func (p *ProposalCommand) Examples() []string {
 		"/proposal admin set-admin user123",
 		"/proposal admin set-min-balance 1000",
 		"/proposal force-end 123e4567-e89b-12d3-a456-426614174000 passed",
+		"/proposal character name \"Love Oracle\"",
+		"/proposal character system \"A friendly AI assistant focused on relationship advice\"",
+		"/proposal character bio \"Expert in relationship counseling,Created by CARV team,Has helped thousands of couples\"",
+		"/proposal character style_tone \"friendly,empathetic,professional\"",
+		"/proposal character style_constraints \"Never judge,Always be supportive,Maintain confidentiality\"",
+		"/proposal character topics \"relationships,dating,marriage,communication,conflict resolution\"",
+		"/proposal character goals \"Help users improve relationships:1.0,Provide actionable advice:0.8,Maintain user privacy:0.9\"",
 	}
 }
 
@@ -519,5 +663,6 @@ func (p *ProposalCommand) GetSubcommands() map[string]string {
 		"get":       "Get details of a specific proposal by ID",
 		"admin":     "Admin commands for governance management",
 		"force-end": "Force end a proposal with a specific status",
+		"character": "Modify character settings (name, system, bio, lore, style_tone, style_constraints, topics, goals)",
 	}
 }

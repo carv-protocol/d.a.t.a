@@ -4,8 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/google/uuid"
 	"github.com/carv-protocol/d.a.t.a/src/internal/governance"
+
+	"github.com/google/uuid"
 )
 
 // ProposalHandler handles proposal related operations

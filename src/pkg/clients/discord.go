@@ -6,10 +6,6 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
-type DiscordConfig struct {
-	APIToken string `mapstructure:"api_token"`
-}
-
 type DiscordMsg struct {
 	AuthorID  string
 	Content   string

@@ -5,7 +5,8 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/carv-protocol/d.a.t.a/src/internal/types"
+	"github.com/carv-protocol/d.a.t.a/src/internal/core"
+
 	"github.com/google/uuid"
 )
 
@@ -35,7 +36,7 @@ type Registry interface {
 	GetMinTokenBalanceForPlatform(platform string) float64
 	SetMinTokenBalance(balance float64) error
 	SetMinTokenBalanceForPlatform(platform string, balance float64) error
-	GetTokenBalance(ctx context.Context, userID string, platform string) (*types.TokenBalance, error)
+	GetTokenBalance(ctx context.Context, userID string, platform string) (*core.TokenBalance, error)
 
 	// Admin config
 	UpdateAdminConfig(config *AdminConfig) error
@@ -49,7 +50,7 @@ type registryImpl struct {
 
 type TokenManager interface {
 	// GetBalance(ctx context.Context, userID string, platform string) (float64, error)
-	FetchNativeTokenBalance(ctx context.Context, userID string, platform string) (*types.TokenBalance, error)
+	FetchNativeTokenBalance(ctx context.Context, userID string, platform string) (*core.TokenBalance, error)
 }
 
 func NewRegistry(db *sql.DB, tokenManager TokenManager, adminConfig *AdminConfig) Registry {
@@ -110,7 +111,7 @@ func (r *registryImpl) SetMinTokenBalance(balance float64) error {
 	return nil
 }
 
-func (r *registryImpl) GetTokenBalance(ctx context.Context, userID string, platform string) (*types.TokenBalance, error) {
+func (r *registryImpl) GetTokenBalance(ctx context.Context, userID string, platform string) (*core.TokenBalance, error) {
 	return r.tokenManager.FetchNativeTokenBalance(ctx, userID, platform)
 }
 
