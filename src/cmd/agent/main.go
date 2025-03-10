@@ -24,6 +24,7 @@ import (
 	"github.com/carv-protocol/d.a.t.a/src/pkg/llm"
 	"github.com/carv-protocol/d.a.t.a/src/pkg/logger"
 	dataPlugin "github.com/carv-protocol/d.a.t.a/src/plugins/plugin-d.a.t.a"
+	governancePlugin "github.com/carv-protocol/d.a.t.a/src/plugins/plugin-d.a.t.a-governance"
 	"github.com/carv-protocol/d.a.t.a/src/web"
 
 	"github.com/google/uuid"
@@ -148,7 +149,8 @@ func initializePlugins(config *conf.Config) *plugins.Registry {
 
 	// Initialize built-in plugins
 	builtinPlugins := map[string]pluginFactory{
-		"d.a.t.a": dataPlugin.NewPlugin,
+		"data":       dataPlugin.NewPlugin,
+		"governance": governancePlugin.NewPlugin,
 	}
 
 	// Load plugins from configuration
