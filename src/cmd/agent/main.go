@@ -10,8 +10,10 @@ import (
 	"time"
 
 	"github.com/carv-protocol/d.a.t.a/src/characters"
+	"github.com/carv-protocol/d.a.t.a/src/internal/commands"
 	"github.com/carv-protocol/d.a.t.a/src/internal/conf"
 	"github.com/carv-protocol/d.a.t.a/src/internal/core"
+	"github.com/carv-protocol/d.a.t.a/src/internal/governance"
 	"github.com/carv-protocol/d.a.t.a/src/internal/memory"
 	"github.com/carv-protocol/d.a.t.a/src/internal/plugins"
 	"github.com/carv-protocol/d.a.t.a/src/internal/social"
@@ -22,6 +24,7 @@ import (
 	"github.com/carv-protocol/d.a.t.a/src/pkg/llm"
 	"github.com/carv-protocol/d.a.t.a/src/pkg/logger"
 	dataPlugin "github.com/carv-protocol/d.a.t.a/src/plugins/plugin-d.a.t.a"
+	governancePlugin "github.com/carv-protocol/d.a.t.a/src/plugins/plugin-d.a.t.a-governance"
 	"github.com/carv-protocol/d.a.t.a/src/web"
 
 	"github.com/google/uuid"
@@ -95,6 +98,9 @@ func initializeAgent(ctx context.Context, config *conf.Config) (*core.Agent, err
 	})
 	stakeholderManager := token.NewStakeholderManager(memoryManager)
 
+	// Initialize governance registry
+	governanceRegistry, err := initializeGovernance(config, tokenManager)
+
 	// Load character
 	character, err := characters.NewCharacter(config.Character, store)
 	if err != nil {
@@ -104,6 +110,9 @@ func initializeAgent(ctx context.Context, config *conf.Config) (*core.Agent, err
 	// Initialize plugins
 	pluginRegistry := initializePlugins(config)
 
+	// Initialize command manager
+	commandManager := initializeCommands(config, governanceRegistry, llmClient, character)
+
 	promptTemplates := config.UserTemplates
 	if config.UserTemplates == nil {
 		promptTemplates = config.DefaultTemplates
@@ -111,11 +120,12 @@ func initializeAgent(ctx context.Context, config *conf.Config) (*core.Agent, err
 
 	// Create agent
 	agentConfig := core.AgentConfig{
-		ID:           uuid.New(),
-		Character:    character,
-		LLMClient:    llmClient,
-		Model:        config.LLMConfig.Model,
-		Stakeholders: stakeholderManager,
+		ID:              uuid.New(),
+		Character:       character,
+		CommandRegistry: commandManager,
+		LLMClient:       llmClient,
+		Model:           config.LLMConfig.Model,
+		Stakeholders:    stakeholderManager,
 		SocialClient: social.NewSocialClient(
 			&config.Social.TwitterConfig,
 			&config.Social.DiscordConfig,
@@ -139,7 +149,8 @@ func initializePlugins(config *conf.Config) *plugins.Registry {
 
 	// Initialize built-in plugins
 	builtinPlugins := map[string]pluginFactory{
-		"d.a.t.a": dataPlugin.NewPlugin,
+		"data":       dataPlugin.NewPlugin,
+		"governance": governancePlugin.NewPlugin,
 	}
 
 	// Load plugins from configuration
@@ -181,6 +192,66 @@ func initializePlugins(config *conf.Config) *plugins.Registry {
 	}
 
 	return registry
+}
+
+// initializeGovernance initializes the governance registry with platform-specific configurations
+func initializeGovernance(config *conf.Config, tokenManager *token.TokenManager) (governance.Registry, error) {
+	// Initialize governance registry
+	governanceRegistry := governance.NewMemoryRegistry(tokenManager)
+
+	// Set up admin configuration from config
+	adminConfig := &governance.AdminConfig{
+		Admins:          config.Governance.DefaultAdminIDs,
+		MinTokenBalance: config.Governance.DefaultMinTokenBalance,
+		PlatformConfigs: make(map[string]*governance.PlatformConfig),
+	}
+
+	// Add platform-specific configurations
+	if config.Governance.Discord != nil {
+		adminConfig.PlatformConfigs["discord"] = &governance.PlatformConfig{
+			Admins:          config.Governance.Discord.AdminIDs,
+			MinTokenBalance: config.Governance.Discord.MinTokenBalance,
+		}
+	}
+
+	if config.Governance.Twitter != nil {
+		adminConfig.PlatformConfigs["twitter"] = &governance.PlatformConfig{
+			Admins:          config.Governance.Twitter.AdminIDs,
+			MinTokenBalance: config.Governance.Twitter.MinTokenBalance,
+		}
+	}
+
+	if config.Governance.Telegram != nil {
+		adminConfig.PlatformConfigs["telegram"] = &governance.PlatformConfig{
+			Admins:          config.Governance.Telegram.AdminIDs,
+			MinTokenBalance: config.Governance.Telegram.MinTokenBalance,
+		}
+	}
+
+	// Update the governance registry with the admin configuration
+	err := governanceRegistry.UpdateAdminConfig(adminConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update admin config: %v", err)
+	}
+
+	return governanceRegistry, nil
+}
+
+func initializeCommands(config *conf.Config, governanceRegistry governance.Registry, llmClient llm.Client, character *characters.Character) *commands.Registry {
+	commandManager := commands.NewRegistry()
+	commands.InitializeCommands(
+		commandManager,
+		governanceRegistry,
+		llmClient,
+		config.LLMConfig.Model,
+		social.NewSocialClient(
+			nil,
+			&config.Social.DiscordConfig,
+			nil,
+		),
+		character,
+	)
+	return commandManager
 }
 
 // checkPluginDependencies verifies that all plugin dependencies are enabled

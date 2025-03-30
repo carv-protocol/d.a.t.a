@@ -21,6 +21,7 @@ type AgentConfig struct {
 	Stakeholders    StakeholderManager
 	TokenManager    TokenManager
 	SocialClient    SocialClient
+	CommandRegistry CommandRegistry
 	PromptTemplates *conf.PromptTemplates
 	PluginRegistry  *plugins.Registry
 	Training        struct {

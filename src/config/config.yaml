@@ -32,6 +32,21 @@ token:
   ticker: "carv"
   contract_addr: "0xc08cd26474722ce93f4d0c34d16201461c10aa8c"
 
+governance:
+  # Default admin configuration (used as fallback)
+  admin_ids: []
+  min_token_balance: 0
+  # Platform-specific configurations
+  discord:
+    admin_ids: []
+    min_token_balance: 1000
+  twitter:
+    admin_ids: []
+    min_token_balance: 1000
+  telegram:
+    admin_ids: []
+    min_token_balance: 1000
+
 social:
   twitter:
     mode: ""
@@ -53,7 +68,7 @@ web:
   port: 8000
 
 plugins:
-  d.a.t.a:
+  data:
     name: "d.a.t.a"
     enabled: true
     version: "1.0.0"
@@ -85,3 +100,18 @@ plugins:
       rpc_url: "https://base.llamarpc.com"
       chain_id: 8453
       timeout: 30s
+
+  governance:
+    name: "d.a.t.a-governance"
+    enabled: true
+    version: "1.0.0"
+    author: "CARV Protocol"
+    description: "Governance plugin for managing proposals and voting"
+    dependencies: []
+    options:
+      min_token_balance: 0
+      proposal_duration: 604800  # 7 days in seconds
+      llm:
+        model: "deepseek-chat"
+        max_tokens: 2000
+        temperature: 0.7      

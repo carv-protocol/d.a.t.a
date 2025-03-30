@@ -121,3 +121,15 @@ type SocialClient interface {
 	GetMessageChannel() <-chan SocialMessage
 	MonitorMessages(ctx context.Context)
 }
+
+type CommandInterface interface {
+	Name() string
+	Description() string
+	Usage() string
+	Examples() []string
+	Execute(ctx context.Context, msg *SocialMessage) error
+}
+
+type CommandRegistry interface {
+	Get(name string) (CommandInterface, bool)
+}

@@ -86,6 +86,11 @@ type PromptTemplates struct {
 	} `mapstructure:"thought_steps"`
 }
 
+type PlatformGovernanceConfig struct {
+	AdminIDs        []string `mapstructure:"admin_ids"`
+	MinTokenBalance float64  `mapstructure:"min_token_balance"`
+}
+
 type PluginConfig struct {
 	Name         string                 `mapstructure:"name"`
 	Enabled      bool                   `mapstructure:"enabled"`
@@ -124,6 +129,14 @@ type Config struct {
 		DiscordConfig  `mapstructure:"discord"`
 		TelegramConfig `mapstructure:"telegram"`
 	} `mapstructure:"social"`
+
+	Governance struct {
+		DefaultAdminIDs        []string                  `mapstructure:"admin_ids"`
+		DefaultMinTokenBalance float64                   `mapstructure:"min_token_balance"`
+		Discord                *PlatformGovernanceConfig `mapstructure:"discord"`
+		Twitter                *PlatformGovernanceConfig `mapstructure:"twitter"`
+		Telegram               *PlatformGovernanceConfig `mapstructure:"telegram"`
+	} `mapstructure:"governance"`
 
 	Token struct {
 		Network      string `mapstructure:"network"`
